@@ -5,8 +5,8 @@ mutable struct Reference{T}
 end
 
 @inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{Reference{T}}, i) where {T}
-    i, ref = ThreadingUtilities.load(p, Ptr{Cvoid}, i)
-    i, getfield(Base.unsafe_pointer_to_objref(ref), :data)
+    i, ref = ThreadingUtilities.load(p, Ptr{Reference{T}}, i)
+    i, getfield(Base.unsafe_pointer_to_objref(ref)::Reference{T}, :data)::T
 end
 @inline function ThreadingUtilities.store!(p::Ptr{UInt}, r::Reference, i)
     ThreadingUtilities.store!(p + sizeof(UInt)*(i += 1), reinterpret(UInt, pointer_from_objref(r)))
