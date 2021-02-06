@@ -27,6 +27,8 @@ using Test
             @test C' isa PtrArray
             @test permutedims(C, Val((2,1))) isa PtrArray
             @test C' == D'
+            @test axes(C) == axes(D)
+            @test axes(C') == axes(D')
         end
         W = rand(2,3,4);
         X = PtrArray(W);
@@ -42,6 +44,7 @@ using Test
             @test_throws BoundsError X[-4]
             @test_throws BoundsError X[2,5,3]
         end
+        @test X === PtrArray(pointer(X), size(X))
         y = rand(77);
         GC.@preserve y begin
             z = PtrArray(y);
@@ -55,12 +58,15 @@ using Test
         xu = zeros(UInt, 100);
         x = rand(100); y = rand(100); z = rand(100);
         t = (x,y,z)
-        r = StrideArraysCore.Reference(t)
-        GC.@preserve xu x y z begin
-            ThreadingUtilities.store!(pointer(xu), r, 0)
-            @test ThreadingUtilities.load(pointer(xu), typeof(r), 0) === (1, t)
+        pt, gt = StrideArraysCore.object_and_preserve(t)
+        GC.@preserve xu gt begin
+            ThreadingUtilities.store!(pointer(xu), pt, 0)
+            @test ThreadingUtilities.load(pointer(xu), typeof(pt), 0) === (1, t)
+            offset = 1
             for a ∈ t
-                p, g = StrideArraysCore.object_and_preserve(a)
+                _p, g = StrideArraysCore.object_and_preserve(a)
+                ThreadingUtilities.store!(pointer(xu), _p, offset)
+                offset, p = ThreadingUtilities.load(pointer(xu), typeof(_p), offset)
                 @test g === a
                 @test p isa PtrArray
                 @test pointer(p) === pointer(a)
