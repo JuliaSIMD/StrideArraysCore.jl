@@ -214,13 +214,4 @@ end
     v
 end
 
-@inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{PtrArray{S,D,T,N,C,B,R,X,O}}, i) where {S,D,T,N,C,B,R,X,O}
-    (i, sp) = ThreadingUtilities.load(p, StridedPointer{T,N,C,B,R,X,O}, i)
-    (i, sz) = ThreadingUtilities.load(p, S, i)
-    i, PtrArray(sp, sz, Val{D}())
-end
-@inline function ThreadingUtilities.store!(p::Ptr{UInt}, A::PtrArray, i)
-    i = ThreadingUtilities.store!(p, stridedpointer(A), i)
-    ThreadingUtilities.store!(p, size(A), i)
-end
 
