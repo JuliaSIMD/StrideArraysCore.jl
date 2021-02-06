@@ -133,7 +133,7 @@ end
 # make the tuple homogenous before indexing
 @inline type_stable_select(t::Tuple, i::Integer) = map(Int, t)[i]
 
-@inline function Base.axes(A::AbstractStrideVector, i::Integer)
+@inline function ArrayInterface.axes(A::AbstractStrideVector, i::Integer)
     if i == 1
         o = type_stable_select(offsets(A), i)
         s = type_stable_select(size(A), i)
@@ -142,14 +142,26 @@ end
         return One():1
     end
 end
-@inline function Base.axes(A::AbstractStrideArray, i::Integer)
+@inline function ArrayInterface.axes(A::AbstractStrideArray, i::Integer)
     o = type_stable_select(offsets(A), i)
     s = type_stable_select(size(A), i)
     create_axis(s, o)
 end
+@inline Base.axes(A::AbstractStrideArray, i::Integer) = axes(A, i)
 
-Base.IndexStyle(::Type{<:AbstractStrideArray}) = IndexCartesian()
-Base.IndexStyle(::Type{<:AbstractStrideVector{<:Any,<:Any,<:Any,1}}) = IndexLinear()
+@inline function ArrayInterface.size(A::AbstractStrideVector, i::Integer)
+    d = Int(length(A))
+    ifelse(isone(i), d, one(d))
+end
+@inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{N}) where {N} = One()
+@inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{1}) = length(A)
+@inline ArrayInterface.size(A::AbstractStrideArray, ::StaticInt{N}) where {N} = size(A)[N]
+@inline ArrayInterface.size(A::AbstractStrideArray, i::Integer) = type_stable_select(size(A), i)
+@inline Base.size(A::AbstractStrideArray, i::Integer) = size(A, i)
+
+
+# Base.IndexStyle(::Type{<:AbstractStrideArray}) = IndexCartesian()
+# Base.IndexStyle(::Type{<:AbstractStrideVector{<:Any,<:Any,<:Any,1}}) = IndexLinear()
 @generated function Base.IndexStyle(::Type{<:AbstractStrideArray{S,D,T,N,C,B,R}}) where {S,D,T,N,C,B,R}
     # if is column major || is a transposed contiguous vector
     if all(D) && ((isone(C) && R === ntuple(identity, Val(N))) || (C === 2 && R === (2,1) && S <: Tuple{One,Integer}))

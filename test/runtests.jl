@@ -11,17 +11,22 @@ using Test
         C = StrideArraysCore.PtrArray(A);
         GC.@preserve A begin
             @test A == B
-            C .*= 3
+            C .*= 3;
             @test A == 3 .* B
             @test C == A
             @test C == 3 .* B
 
             D = copy(A);
             Cslice = view(C, 23:48, 17:89)
-            Cslice .= 2
+            Cslice .= 2;
             @test D != C
-            D[23:48,17:89] .= 2
+            D[23:48,17:89] .= 2;
             @test D == C
+            @test C === view(C, :, :)
+            @test @inferred(size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), 1)) === 8
+            @test @inferred(size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), StrideArraysCore.StaticInt(1))) === StrideArraysCore.StaticInt(8)
+            @test @inferred(StrideArraysCore.size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), 1)) === 8
+            @test @inferred(StrideArraysCore.size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), StrideArraysCore.StaticInt(1))) === StrideArraysCore.StaticInt(8)
 
             @test C  isa PtrArray
             @test C' isa PtrArray
@@ -29,6 +34,9 @@ using Test
             @test C' == D'
             @test axes(C) == axes(D)
             @test axes(C') == axes(D')
+            @test eachindex(view(C, :, 2:6)) == 1:(5*size(C,1))
+            @test eachindex(view(C', 2:6, :)') == 1:(5*size(C,1))
+            @test eachindex(view(C, 2:6, :)) == CartesianIndices((5, size(C,2)))
         end
         W = rand(2,3,4);
         X = PtrArray(W);
