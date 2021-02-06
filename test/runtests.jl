@@ -23,10 +23,10 @@ using Test
             D[23:48,17:89] .= 2;
             @test D == C
             @test C === view(C, :, :)
-            @test @inferred(size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), 1)) === 8
-            @test @inferred(size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), StrideArraysCore.StaticInt(1))) === StrideArraysCore.StaticInt(8)
-            @test @inferred(StrideArraysCore.size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), 1)) === 8
-            @test @inferred(StrideArraysCore.size(view(C, StrideArraysCore.StaticInt(1):StrideArraysCore.StaticInt(8), :), StrideArraysCore.StaticInt(1))) === StrideArraysCore.StaticInt(8)
+            @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
+            @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
+            @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
+            @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
 
             @test C  isa PtrArray
             @test C' isa PtrArray
@@ -37,6 +37,7 @@ using Test
             @test eachindex(view(C, :, 2:6)) == 1:(5*size(C,1))
             @test eachindex(view(C', 2:6, :)') == 1:(5*size(C,1))
             @test eachindex(view(C, 2:6, :)) == CartesianIndices((5, size(C,2)))
+            @test axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)) === StrideArraysCore.CloseOpen(StaticInt(5))
         end
         W = rand(2,3,4);
         X = PtrArray(W);
@@ -67,7 +68,9 @@ using Test
         x = rand(100); y = rand(100); z = rand(100);
         t = (x,y,z)
         pt, gt = StrideArraysCore.object_and_preserve(t)
-        GC.@preserve xu gt begin
+        greet = ["Hello", "world", "hang", "in", "there"]
+        pg, gg = StrideArraysCore.object_and_preserve(greet)
+        GC.@preserve xu gt gg begin
             ThreadingUtilities.store!(pointer(xu), pt, 0)
             @test ThreadingUtilities.load(pointer(xu), typeof(pt), 0) === (1, t)
             offset = 1
@@ -81,6 +84,8 @@ using Test
                 @test p !== a
                 @test p == a
             end
+            ThreadingUtilities.store!(pointer(xu), pg, offset)
+            @test ThreadingUtilities.load(pointer(xu), typeof(pg), offset) === (offset+1, greet)            
         end
     end
 end
