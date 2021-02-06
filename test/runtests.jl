@@ -8,19 +8,27 @@ function closeopensum(x)
     end
     s
 end
+function closeopensumfastmath(x)
+    s = zero(eltype(x))
+    @inbounds @fastmath for i ∈ StrideArraysCore.CloseOpen(length(x))
+        s += x[i+1]
+    end
+    s
+end
 
 @testset "StrideArraysCore.jl" begin
 
     Aqua.test_all(StrideArraysCore)
-    
+
     @testset "StrideArrays Basic" begin
         A = rand(100, 100);
         B = copy(A);
         C = StrideArraysCore.PtrArray(A);
         GC.@preserve A begin
             @test closeopensum(C) == closeopensum(A)
+            @test closeopensumfastmath(C) == closeopensumfastmath(A)
             @test sum(C) == sum(A)
-            @test closeopensum(C) ≈ sum(C)
+            @test closeopensum(C) ≈ closeopensumfastmath(C) ≈ sum(C)
             @test A == B
             C .*= 3;
             @test A == 3 .* B
@@ -51,6 +59,16 @@ end
             @test @inferred(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1))) === StrideArraysCore.CloseOpen(StaticInt(5))
             @test @inferred(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1))) === StrideArraysCore.CloseOpen(StaticInt(5))
             @test @inferred(length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))) === StaticInt(5)
+            @test @inferred(length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), 1))) === 5
+            ax1, ax2 = axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :))
+            @test StrideArraysCore.ArrayInterface.known_length(ax1) == 5
+            @test StrideArraysCore.ArrayInterface.known_length(ax2) === nothing
+            @test StrideArraysCore.ArrayInterface.known_first(ax1) == 0
+            @test StrideArraysCore.ArrayInterface.known_first(ax2) == 0
+            @test StrideArraysCore.ArrayInterface.known_step(ax1) == 1
+            @test StrideArraysCore.ArrayInterface.known_step(ax2) == 1
+            @test StrideArraysCore.ArrayInterface.known_last(ax1) == 4
+            @test StrideArraysCore.ArrayInterface.known_last(ax2) === nothing
         end
         W = rand(2,3,4);
         X = PtrArray(W);
@@ -71,6 +89,9 @@ end
         GC.@preserve y begin
             z = PtrArray(y);
             @test y == z
+            @test y' == z'
+            @test PtrArray(y') === z'
+            @test PtrArray(transpose(y)) === transpose(PtrArray(y))
             @test pointer(y) === pointer(z)
             @test_throws BoundsError z[-8]
             @test_throws BoundsError z[88]
