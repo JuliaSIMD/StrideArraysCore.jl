@@ -9,7 +9,7 @@ using VectorizationBase: align, gep, AbstractStridedPointer, AbstractSIMDVector,
     static_sizeof, lazymul, vmul_fast, StridedPointer, gesp, zero_offsets, pause, zstridedpointer,
     val_dense_dims, val_stride_rank, preserve_buffer
 
-
+export PtrArray
 
 include("ptr_array.jl")
 include("thread_compatible.jl")
