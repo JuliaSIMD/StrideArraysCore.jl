@@ -37,6 +37,6 @@ end
 @inline array_object_and_preserve(::ArrayInterface.CPUPointer, A::AbstractArray) = (PtrArray(A), preserve_buffer(A))
 @inline array_object_and_preserve(_, A::AbstractArray) = _object_and_preserve(A, False())
 
-
+@inline object_and_preserve(r::Base.RefValue{T}) where {T} = (Base.unsafe_convert(Ptr{T}, r), r)
 
 
