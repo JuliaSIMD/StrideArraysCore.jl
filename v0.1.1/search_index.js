@@ -1,0 +1,3 @@
+var documenterSearchIndex = {"docs":
+[{"location":"","page":"Home","title":"Home","text":"CurrentModule = StrideArraysCore","category":"page"},{"location":"#StrideArraysCore","page":"Home","title":"StrideArraysCore","text":"","category":"section"},{"location":"","page":"Home","title":"Home","text":"","category":"page"},{"location":"","page":"Home","title":"Home","text":"Modules = [StrideArraysCore]","category":"page"},{"location":"#StrideArraysCore.rank_to_sortperm-Union{Tuple{Tuple{Vararg{Int64,N}}}, Tuple{N}} where N","page":"Home","title":"StrideArraysCore.rank_to_sortperm","text":"rank_to_sortperm(::NTuple{N,Int}) -> NTuple{N,Int}\n\nReturns the sortperm of the stride ranks.\n\n\n\n\n\n","category":"method"}]
+}
