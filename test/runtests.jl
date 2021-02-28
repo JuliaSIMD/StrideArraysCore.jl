@@ -104,7 +104,9 @@ end
         pt, gt = StrideArraysCore.object_and_preserve(t)
         greet = ["Hello", "world", "hang", "in", "there"]
         pg, gg = StrideArraysCore.object_and_preserve(greet)
-        GC.@preserve xu gt gg begin
+        ph, gh = StrideArraysCore.object_and_preserve(greet[1])
+        pht, ght = StrideArraysCore.object_and_preserve((3,greet[1]))
+        GC.@preserve xu gt gg gh ght begin
             ThreadingUtilities.store!(pointer(xu), pt, 0)
             @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pt), 0)) === (1, t)
             offset = 1
@@ -120,6 +122,10 @@ end
             end
             ThreadingUtilities.store!(pointer(xu), pg, offset)
             @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pg), offset)) === (offset+1, greet)
+            ThreadingUtilities.store!(pointer(xu), ph, offset)
+            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(ph), offset)) === (offset+1, greet[1])
+            ThreadingUtilities.store!(pointer(xu), pht, offset)
+            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pht), offset)) === (offset+1, (3,greet[1]))
         end
     end
 end

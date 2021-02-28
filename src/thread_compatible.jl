@@ -4,6 +4,8 @@ mutable struct Reference{T}
     data::T
 end
 
+@inline dereference(r::Reference) = getfield(r, :data)
+@inline dereference(r) = r
 @inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{Reference{T}}, i) where {T}
     i, ref = ThreadingUtilities.load(p, Ptr{Reference{T}}, i)
     i, getfield(Base.unsafe_pointer_to_objref(ref)::Reference{T}, :data)::T
