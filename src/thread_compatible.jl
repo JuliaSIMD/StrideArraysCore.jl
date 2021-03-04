@@ -12,8 +12,8 @@ end
     # i, getfield(unsafe_load(ref)::Reference{T}, :data)::T
 end
 @inline function ThreadingUtilities.store!(p::Ptr{UInt}, r::Reference, i)
-    ThreadingUtilities.store!(p + sizeof(UInt)*(i += 1), reinterpret(UInt, pointer_from_objref(r)))
-    i
+    ThreadingUtilities.store!(p + i, reinterpret(UInt, pointer_from_objref(r)))
+    i + sizeof(UInt)
 end
 @inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{PtrArray{S,D,T,N,C,B,R,X,O}}, i) where {S,D,T,N,C,B,R,X,O}
     (i, sp) = ThreadingUtilities.load(p, StridedPointer{T,N,C,B,R,X,O}, i)

@@ -1,7 +1,7 @@
 name = "StrideArraysCore"
 uuid = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 authors = ["Chris Elrod <elrodc@gmail.com> and contributors"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -12,7 +12,7 @@ VectorizationBase = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
 [compat]
 ArrayInterface = "3.0.2"
 Requires = "1"
-ThreadingUtilities = "0.2"
+ThreadingUtilities = "0.3"
 VectorizationBase = "0.18.8,0.19"
 julia = "1.5"
 
