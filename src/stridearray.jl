@@ -21,6 +21,51 @@ const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
 
 @inline StrideArray(A::AbstractArray) = StrideArray(PtrArray(A), A)
 
+@inline function StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{Integer,N}}) where {N,T}
+    x, L = calc_strides_len(T,s)
+    b = undef_memory_buffer(T, L ÷ static_sizeof(T))
+    # For now, just trust Julia's alignment heuristics are doing the right thing
+    # to save us from having to over-allocate
+    # ptr = VectorizationBase.align(pointer(b))
+    ptr = pointer(b)
+    StrideArray(ptr, s, x, b, all_dense(Val{N}()))
+end
+@inline function StrideArray(ptr::Ptr{T}, s::S, x::X, b, ::Val{D}) where {S,X,T,D}
+    StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
+end
+
+function dense_quote(N::Int, b::Bool)
+    d = Expr(:tuple)
+    for n in 1:N
+        push!(d.args, b)
+    end
+    Expr(:call, Expr(:curly, :Val, d))
+end
+@generated all_dense(::Val{N}) where {N} = dense_quote(N, true)
+
+@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{StaticInt,N}}) where {T, N}
+    L = sizeof(T)
+    t = Expr(:tuple)
+    for n ∈ 1:N
+        push!(t.args, static_expr(L))
+        L *= s.parameters[n].parameters[1]
+    end
+    Expr(:tuple, t, static_expr(L))
+end
+@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Any,N}}) where {T, N}
+    last_sx = :s_0
+    q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(sizeof(T))))
+    t = Expr(:tuple)
+    for n ∈ 1:N
+        push!(t.args, last_sx)
+        new_sx = Symbol(:s_,n)
+        push!(q.args, Expr(:(=), new_sx, Expr(:call, :vmul_fast, last_sx, Expr(:ref, :s, n))))
+        last_sx = new_sx
+    end
+    push!(q.args, Expr(:tuple, t, last_sx))
+    q
+end
+
 @inline VectorizationBase.preserve_buffer(A::MemoryBuffer) = A
 @inline VectorizationBase.preserve_buffer(A::StrideArray) = preserve_buffer(A.data)
 
