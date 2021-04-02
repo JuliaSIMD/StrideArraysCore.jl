@@ -127,5 +127,17 @@ end
             ThreadingUtilities.store!(pointer(xu), pht, offset)
             @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pht), offset)) === (offset+sizeof(UInt), (3,greet[1]))
         end
+
+        greetsa = StrideArray(greet);
+        @test greetsa == greet
+        greetsa[1] = "howdy"
+        greetsa[5] = "there!"
+        @test greet[1] == "howdy"
+        @test greet[5] == "there!"
+        A = rand(ComplexF64, 4, 5);
+        Asa = StrideArray(A);
+        @test A == Asa
+        Asa[3,4] = 1234.5 + 678.9im;
+        @test A[3,4] == 1234.5 + 678.9im;
     end
 end

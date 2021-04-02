@@ -9,10 +9,11 @@ using VectorizationBase: align, gep, AbstractStridedPointer, AbstractSIMDVector,
     static_sizeof, lazymul, vmul_fast, StridedPointer, gesp, zero_offsets, pause, zstridedpointer,
     val_dense_dims, val_stride_rank, preserve_buffer
 
-export PtrArray, StaticInt
+export PtrArray, StrideArray, StaticInt
 
 include("closeopen.jl")
 include("ptr_array.jl")
+include("stridearray.jl")
 include("thread_compatible.jl")
 include("views.jl")
 include("adjoints.jl")
