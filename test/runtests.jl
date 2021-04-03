@@ -142,12 +142,20 @@ end
     end
     @testset "StrideArrays Initialization" begin
         A = StrideArray{Float64}(undef, (3, 5));
+        @test StrideArraysCore.size(A) === (3, 5)
         @test StrideArraysCore.strides(A) === (StaticInt(1),3)
+        @test StrideArraysCore.static_length(A) === 15
 
         B = StrideArray{Float64}(undef, (StaticInt(3), 5));
         @test StrideArraysCore.strides(B) === (StaticInt(1), StaticInt(3))
         @test StrideArraysCore.size(B) === (StaticInt(3), 5);
-        for C ∈ [A,B]
+        @test StrideArraysCore.static_length(B) === 15
+
+        D = StrideArray{Float64}(undef, (StaticInt(3), StaticInt(5)));
+        @test StrideArraysCore.strides(D) === (StaticInt(1), StaticInt(3))
+        @test StrideArraysCore.size(D) === (StaticInt(3), StaticInt(5));
+        @test StrideArraysCore.static_length(D) === StaticInt(15)
+        for C ∈ [A,B,D]
             @test strides(C) === (1, 3)
             @test size(C) === (3, 5);
             @test StrideArraysCore.offsets(C) === (StaticInt(1),StaticInt(1))
