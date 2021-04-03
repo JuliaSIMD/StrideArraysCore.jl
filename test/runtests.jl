@@ -140,4 +140,22 @@ end
         Asa[3,4] = 1234.5 + 678.9im;
         @test A[3,4] == 1234.5 + 678.9im;
     end
+    @testset "StrideArrays Initialization" begin
+        A = StrideArray{Float64}(undef, (3, 5));
+        @test StrideArraysCore.strides(A) === (StaticInt(1),3)
+
+        B = StrideArray{Float64}(undef, (StaticInt(3), 5));
+        @test StrideArraysCore.strides(B) === (StaticInt(1), StaticInt(3))
+        @test StrideArraysCore.size(B) === (StaticInt(3), 5);
+        for C ∈ [A,B]
+            @test strides(C) === (1, 3)
+            @test size(C) === (3, 5);
+            @test StrideArraysCore.offsets(C) === (StaticInt(1),StaticInt(1))
+            @test StrideArraysCore.offsets(StrideArraysCore.zeroindex(C)) === (StaticInt(0),StaticInt(0))
+            C[2,3] = 4
+            StrideArraysCore.zeroindex(C)[2,3] = -10
+            @test C[2,3] === StrideArraysCore.zeroindex(C)[1,2] === 4.0
+            @test C[3,4] === StrideArraysCore.zeroindex(C)[2,3] === -10.0
+        end
+    end
 end

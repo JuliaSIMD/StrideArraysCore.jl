@@ -5,6 +5,20 @@ mutable struct MemoryBuffer{L,T} <: DenseVector{T}
         new{L,T}()
     end
 end
+@inline Base.unsafe_convert(::Type{Ptr{T}}, d::MemoryBuffer) where {T} = Base.unsafe_convert(Ptr{T}, Base.pointer_from_objref(d))
+@inline MemoryBuffer{T}(::UndefInitializer, ::StaticInt{L}) where {L,T} = MemoryBuffer{L,T}(undef)
+Base.size(::MemoryBuffer{L}) where L = (L,)
+@inline Base.similar(::MemoryBuffer{L,T}) where {L,T} = MemoryBuffer{L,T}(undef)
+# Base.IndexStyle(::Type{<:MemoryBuffer}) = Base.IndexLinear()
+@inline function Base.getindex(m::MemoryBuffer{L,T}, i::Int) where {L,T}
+    @boundscheck checkbounds(m, i)
+    GC.@preserve m x = vload(pointer(m), VectorizationBase.lazymul(VectorizationBase.static_sizeof(T), i - one(i)))
+    x
+end
+@inline function Base.setindex!(m::MemoryBuffer{L,T}, x, i::Int) where {L,T}
+    @boundscheck checkbounds(m, i)
+    GC.@preserve m vstore!(pointer(m), convert(T, x), lazymul(static_sizeof(T), i - one(i)))
+end
 
 @inline undef_memory_buffer(::Type{T}, ::StaticInt{L}) where {T,L} = MemoryBuffer{L,T}(undef)
 @inline undef_memory_buffer(::Type{T}, L) where {T} = Vector{T}(undef, L)
@@ -33,6 +47,9 @@ end
 @inline function StrideArray(ptr::Ptr{T}, s::S, x::X, b, ::Val{D}) where {S,X,T,D}
     StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
 end
+@inline StrideArray(::UndefInitializer, s::Vararg{Integer,N}) where {N} = StrideArray{Float64}(undef, s)
+@inline StrideArray(::UndefInitializer, ::Type{T}, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(undef, s)
+
 
 function dense_quote(N::Int, b::Bool)
     d = Expr(:tuple)
@@ -67,7 +84,9 @@ end
 end
 
 @inline VectorizationBase.preserve_buffer(A::MemoryBuffer) = A
-@inline VectorizationBase.preserve_buffer(A::StrideArray) = preserve_buffer(A.data)
+@inline VectorizationBase.preserve_buffer(A::StrideArray) = preserve_buffer(getfield(A, :data))
+
+@inline PtrArray(A::StrideArray) = getfield(A, :ptr)
 
 @inline maybe_ptr_array(A) = A
 @inline maybe_ptr_array(A::AbstractArray) = maybe_ptr_array(ArrayInterface.device(A), A)
@@ -86,6 +105,34 @@ end
 
 @inline zeroindex(r::CloseOpen{Zero}) = r
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{Zero}) = r
+@inline zeroindex(A::PtrArray{S,D}) where {S,D} = PtrArray(zstridedpointer(A), size(A), Val{D}())
+@inline zeroindex(A::StrideArray) = StrideArray(zeroindex(PtrArray(A)), preserve_buffer(A))
+
+@generated rank_to_sortperm_val(::Val{R}) where {R} = :(Val{$(rank_to_sortperm(R))}())
+@inline function similar_layout(A::AbstractStrideArray{S,D,T,N,C,B,R}) where {S,D,T,N,C,B,R}
+    permutedims(similar(permutedims(A, rank_to_sortperm_val(Val{R}()))), Val{R}())
+end
+@inline function similar_layout(A::AbstractArray)
+    b = preserve_buffer(A)
+    GC.@preserve b begin
+        similar_layout(PtrArray(A))
+    end
+end
+@inline function Base.similar(A::AbstractStrideArray{S,D,T}) where {S,D,T}
+    StrideArray{T}(undef, size(A))
+end
+
+
+@inline function Base.view(A::StrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
+    StrideArray(view(A.ptr, i...), A.data)
+end
+@inline function zview(A::StrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
+    StrideArray(zview(A.ptr, i...), A.data)
+end
+@inline function Base.permutedims(A::StrideArray, ::Val{P}) where {P}
+    StrideArray(permutedims(A.ptr, Val{P}()), A.data)
+end
+@inline Base.adjoint(a::StrideVector) = StrideArray(adjoint(a.ptr), a.data)
 
 
 function gc_preserve_call(ex, skip=0)
