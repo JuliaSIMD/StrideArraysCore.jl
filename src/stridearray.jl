@@ -61,7 +61,7 @@ end
 @generated all_dense(::Val{N}) where {N} = dense_quote(N, true)
 
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{StaticInt,N}}) where {T, N}
-    L = sizeof(T)
+    L = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
     t = Expr(:tuple)
     for n ∈ 1:N
         push!(t.args, static_expr(L))
@@ -71,7 +71,8 @@ end
 end
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Any,N}}) where {T, N}
     last_sx = :s_0
-    q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(sizeof(T))))
+    st = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
+    q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(st)))
     t = Expr(:tuple)
     for n ∈ 1:N
         push!(t.args, last_sx)
