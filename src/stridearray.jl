@@ -49,6 +49,9 @@ end
 end
 @inline StrideArray(::UndefInitializer, s::Vararg{Integer,N}) where {N} = StrideArray{Float64}(undef, s)
 @inline StrideArray(::UndefInitializer, ::Type{T}, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(undef, s)
+@inline function StrideArray(A::PtrArray{S,D,T,N}, s::Tuple{Vararg{Integer,N}}) where {S,D,T,N}
+  PtrArray(stridedpointer(A), s, val_dense_dims(A))
+end
 @inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Integer,N}}) where {T,N}
   StrideArray(PtrArray(stridedpointer(A), s, val_dense_dims(A)), preserve_buffer(A))
 end
