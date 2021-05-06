@@ -77,7 +77,7 @@ end
 
 function ptrarray_densestride_quote(::Type{T}, N, stridedpointer_offsets) where {T}
     last_sx = :s_0
-    q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(sizeof(T))))
+    q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_sizeof(T)))
     t = Expr(:tuple); d = Expr(:tuple);
     n = 0
     while true
@@ -100,23 +100,27 @@ end
 end
 
 @generated function ArrayInterface.strides(A::PtrArray{S,D,T,N}) where {S,D,T,N}
-    shifter = static_expr(VectorizationBase.intlog2(sizeof(T)))
-    x = Expr(:tuple)
-    for n in 1:N
-        push!(x.args, Expr(:call, :(>>>), Expr(:ref, :x, n), shifter))
-    end
-    quote
-        $(Expr(:meta,:inline))
-        x = A.ptr.strd
-        $x
-    end
+  size_T = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
+  shifter = static_expr(VectorizationBase.intlog2(size_T))
+  x = Expr(:tuple)
+  for n in 1:N
+    push!(x.args, Expr(:call, :(>>>), Expr(:ref, :x, n), shifter))
+  end
+  quote
+    $(Expr(:meta,:inline))
+    x = A.ptr.strd
+    $x
+  end
 end
 
 @inline Base.size(A::AbstractStrideArray) = map(Int, size(A))
 @inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
-@inline create_axis(s, ::One) = One():s
+@inline function create_axis(s, ::One)
+  VectorizationBase.assume(s ≥ 0)
+  Base.OneTo(s)
+end
 @inline create_axis(s, o) = CloseOpen(o, s+o)
 
 @inline ArrayInterface.axes(A::AbstractStrideArray) = map(create_axis, size(A), offsets(A))
@@ -172,58 +176,126 @@ end
 end
 
 @inline VectorizationBase.preserve_buffer(A::PtrArray) = nothing
-Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, i::Int, j::Int) = A[i]
-@inline function Base.getindex(A::PtrArray{S,D,T,K}, i::Vararg{Integer,K}) where {S,D,T,K}
-    @boundscheck checkbounds(A, i...)
-    vload(stridedpointer(A), i)
+
+
+@generated function pload(p::Ptr{T}) where {T}
+  if Base.allocatedinline(T)
+    Expr(:block, Expr(:meta,:inline), :(unsafe_load(p)))
+  else
+    Expr(:block, Expr(:meta,:inline), :(ccall(:jl_value_ptr, Ref{$T}, (Ptr{Cvoid},), unsafe_load(Base.unsafe_convert(Ptr{Ptr{Cvoid}}, p)))))
+  end
 end
-@inline function Base.getindex(A::AbstractStrideArray{S,D,T,K}, i::Vararg{Integer,K}) where {S,D,T,K}
-    b = preserve_buffer(A)
-    P = PtrArray(A)
-    GC.@preserve b begin
-        @boundscheck checkbounds(P, i...)
-        vload(stridedpointer(P), i)
+@generated function pstore!(p::Ptr{T}, v::T) where {T}
+  if Base.allocatedinline(T)
+    Expr(:block, Expr(:meta,:inline), :(unsafe_store!(p, v); return nothing))
+  else
+    Expr(:block, Expr(:meta,:inline), :(unsafe_store!(Base.unsafe_convert(Ptr{Ptr{Cvoid}}, p), Base.pointer_from_objref(v)); return nothing))
+  end
+end
+@inline pstore!(p::Ptr{T}, v) where {T} = pstore!(p, convert(T, v))
+
+function rank2sortperm(R)
+  map(R) do r
+    sum(map(≥(r),R))
+  end
+end
+# @generated function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
+#   if N ≠ NI
+#     if (N > NI) & (NI ≠ 1)
+#       throw(ArgumentError("If the dimension of the array exceeds the dimension of the index, then the index should be linear/one dimensional."))
+#     end
+#     # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
+#     return Expr(:block, Expr(:meta,:inline), :(pointer(ptr) + (first(i)-1)*$(static_sizeof(T))))
+#   end
+#   sp = rank2sortperm(R)
+#   q = Expr(:block, Expr(:meta,:inline), :(p = pointer(ptr)), :(o = VectorizationBase.offsets(ptr)), :(x = strides(ptr)))
+#   gf = GlobalRef(Core,:getfield)
+#   for n ∈ 1:N
+#     j = findfirst(==(n),sp)::Int
+#     index = Expr(:call, gf, :i, j, false)
+#     offst = Expr(:call, gf, :o, j, false)
+#     strid = Expr(:call, gf, :x, j, false)
+#     push!(q.args, :(p += ($index - $offst)*$strid))
+#   end
+#   q
+# end
+@generated function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
+  if N ≠ NI
+    if (N > NI) & (NI ≠ 1)
+      throw(ArgumentError("If the dimension of the array exceeds the dimension of the index, then the index should be linear/one dimensional."))
     end
+    # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
+    return Expr(:block, Expr(:meta,:inline), :(pointer(ptr) + (first(i)-1)*$(static_sizeof(T))))
+  end
+  sp = rank2sortperm(R)
+  q = Expr(:block, Expr(:meta,:inline), :(p = pointer(ptr)), :(o = VectorizationBase.offsets(ptr)), :(x = strides(ptr)))
+  gf = GlobalRef(Core,:getfield)
+  for n ∈ 1:N
+    j = findfirst(==(n),sp)::Int
+    index = Expr(:call, gf, :i, j, false)
+    offst = Expr(:call, gf, :o, j, false)
+    strid = Expr(:call, gf, :x, j, false)
+    push!(q.args, :(p += ($index - $offst)*$strid))
+  end
+  q
 end
-@inline function Base.setindex!(A::PtrArray{S,D,T,K}, v, i::Vararg{Integer,K}) where {S,D,T,K}
-    @boundscheck checkbounds(A, i...)
-    vstore!(stridedpointer(A), v, i)
-    v
+# @inline _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R,X,NTuple{N,Zero}}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI,X} = __offset_ptr(ptr,i)
+# @inline function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
+#   __offset_ptr(VectorizationBase.center(ptr), i)
+# end
+
+# Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, i::Int, j::Int) = A[i]
+@inline function Base.getindex(A::PtrArray, i::Vararg{Integer})
+  @boundscheck checkbounds(A, i...)
+  pload(_offset_ptr(stridedpointer(A), i))
 end
-@inline function Base.setindex!(A::AbstractStrideArray{S,D,T,K}, v, i::Vararg{Integer,K}) where {S,D,T,K}
-    b = preserve_buffer(A)
-    P = PtrArray(A)
-    GC.@preserve b begin
-        @boundscheck checkbounds(P, i...)
-        vstore!(stridedpointer(P), v, i)
-    end
-    v
+@inline function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer})
+  b = preserve_buffer(A)
+  P = PtrArray(A)
+  GC.@preserve b begin
+    @boundscheck checkbounds(P, i...)
+    pload(_offset_ptr(stridedpointer(A), i))
+  end
 end
-@inline function Base.getindex(A::PtrArray, i::Integer)
-    @boundscheck checkbounds(A, i)
-    vload(stridedpointer(A), (i - one(i),))
+@inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer})
+  @boundscheck checkbounds(A, i...)
+  pstore!(_offset_ptr(stridedpointer(A), i), v)
+  v
 end
-@inline function Base.getindex(A::AbstractStrideArray, i::Integer)
-    b = preserve_buffer(A)
-    P = PtrArray(A)
-    GC.@preserve b begin
-        @boundscheck checkbounds(P, i)
-        vload(stridedpointer(P), (i - one(i),))
-    end
+@inline function Base.setindex!(A::AbstractStrideArray, v, i::Vararg{Integer})
+  b = preserve_buffer(A)
+  P = PtrArray(A)
+  GC.@preserve b begin
+    @boundscheck checkbounds(P, i...)
+    pstore!(_offset_ptr(stridedpointer(A), i), v)
+  end
+  v
 end
-@inline function Base.setindex!(A::PtrArray, v, i::Integer)
-    @boundscheck checkbounds(A, i)
-    vstore!(stridedpointer(A), v, (i - one(i),))
-    v
+@inline function Base.getindex(A::PtrArray{S,D,T}, i::Integer) where {S,D,T}
+  @boundscheck checkbounds(A, i)
+  pload(pointer(A) + (i-oneunit(i))*static_sizeof(T))
 end
-@inline function Base.setindex!(A::AbstractStrideArray, v, i::Integer)
-    b = preserve_buffer(A)
-    P = PtrArray(A)
-    GC.@preserve b begin
-        @boundscheck checkbounds(P, i)
-        vstore!(stridedpointer(P), v, (i - one(i),))
-    end
-    v
+@inline function Base.getindex(A::AbstractStrideArray{S,D,T}, i::Integer) where {S,D,T}
+  b = preserve_buffer(A)
+  P = PtrArray(A)
+  GC.@preserve b begin
+    @boundscheck checkbounds(P, i)
+    pload(pointer(A) + (i-oneunit(i))*static_sizeof(T))
+  end
+end
+@inline function Base.setindex!(A::PtrArray{S,D,T}, v, i::Integer) where {S,D,T}
+  @boundscheck checkbounds(A, i)
+  pstore!(pointer(A) + (i-oneunit(i))*static_sizeof(T), v)
+  v
+end
+@inline function Base.setindex!(A::AbstractStrideArray{S,D,T}, v, i::Integer) where {S,D,T}
+  b = preserve_buffer(A)
+  P = PtrArray(A)
+  GC.@preserve b begin
+    @boundscheck checkbounds(P, i)
+    pstore!(pointer(A) + (i-oneunit(i))*static_sizeof(T), v)
+  end
+  v
 end
 
 

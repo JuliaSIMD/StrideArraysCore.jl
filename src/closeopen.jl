@@ -9,11 +9,16 @@ struct CloseOpen{L <: Union{Int,StaticInt}, U <: Union{Int,StaticInt}} <: Abstra
 end
 @inline CloseOpen(len::Integer) = CloseOpen(Zero(), len)
 
-@inline Base.first(r::CloseOpen) = r.start
+@inline Base.first(r::CloseOpen{Int}) = getfield(r,:start)
+@inline Base.first(r::CloseOpen{StaticInt{F}}) where {F} = F
 @inline Base.step(::CloseOpen) = One()
-@inline Base.last(r::CloseOpen) = r.upper - One()
-@inline Base.length(r::CloseOpen) = r.upper - r.start
-@inline Base.length(r::CloseOpen{Zero}) = r.upper
+# @inline Base.last(r::CloseOpen{<:Any,Int}) = getfield(r,:upper) - One()
+@inline Base.last(r::CloseOpen{<:Any,Int}) = getfield(r,:upper) - One()
+@inline Base.last(r::CloseOpen{<:Any,StaticInt{L}}) where {L} = L - 1
+@inline ArrayInterface.static_first(r::CloseOpen) = getfield(r,:start)
+@inline ArrayInterface.static_last(r::CloseOpen) = getfield(r,:upper) - One()
+@inline Base.length(r::CloseOpen) = getfield(r,:upper) - getfield(r,:start)
+@inline Base.length(r::CloseOpen{Zero}) = getfield(r,:upper)
 
 @inline Base.iterate(r::CloseOpen) = (i = Int(first(r)); (i, i))
 @inline Base.iterate(r::CloseOpen, i::Int) = (i += 1) ≥ r.upper ? nothing : (i, i)

@@ -15,6 +15,13 @@ function closeopensumfastmath(x)
     end
     s
 end
+function cartesianindexsum(A)
+  s = zero(eltype(A))
+  @inbounds @simd for I ∈ CartesianIndices(A)
+    s += A[I]
+  end
+  s
+end
 
 @testset "StrideArraysCore.jl" begin
 
@@ -83,6 +90,8 @@ end
             @test_throws BoundsError X[length(X) + 1]
             @test_throws BoundsError X[-4]
             @test_throws BoundsError X[2,5,3]
+            @test cartesianindexsum(W) ≈ cartesianindexsum(X)
+            @test iszero(@allocated cartesianindexsum(X))
         end
         @test X === PtrArray(pointer(X), size(X))
         y = rand(77);
