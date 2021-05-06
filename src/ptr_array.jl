@@ -117,7 +117,7 @@ end
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
 @inline create_axis(s, ::One) = One():s
-@inline create_axis(s, o) = CloseOpen(s, s+o)
+@inline create_axis(s, o) = CloseOpen(o, s+o)
 
 @inline ArrayInterface.axes(A::AbstractStrideArray) = map(create_axis, size(A), offsets(A))
 @inline Base.axes(A::AbstractStrideArray) = axes(A)
