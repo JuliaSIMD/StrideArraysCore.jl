@@ -31,6 +31,11 @@ end
         A = rand(100, 100);
         B = copy(A);
         C = StrideArraysCore.PtrArray(A);
+        @test similar(C) isa StrideArraysCore.StrideArray
+        let D = similar(C,Float32)
+            @test D isa StrideArraysCore.StrideArray
+            @test eltype(D) === Float32
+        end
         GC.@preserve A begin
             @test closeopensum(C) == closeopensum(A)
             @test closeopensumfastmath(C) == closeopensumfastmath(A)
