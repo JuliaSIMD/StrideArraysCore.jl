@@ -249,7 +249,7 @@ end
   @boundscheck checkbounds(A, i...)
   pload(_offset_ptr(stridedpointer(A), i))
 end
-@inline function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer})
+@inline function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer,K}) where {K}
   b = preserve_buffer(A)
   P = PtrArray(A)
   GC.@preserve b begin
@@ -257,12 +257,12 @@ end
     pload(_offset_ptr(stridedpointer(A), i))
   end
 end
-@inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer})
+@inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer,K}) where {K}
   @boundscheck checkbounds(A, i...)
   pstore!(_offset_ptr(stridedpointer(A), i), v)
   v
 end
-@inline function Base.setindex!(A::AbstractStrideArray, v, i::Vararg{Integer})
+@inline function Base.setindex!(A::AbstractStrideArray, v, i::Vararg{Integer,K}) where {K}
   b = preserve_buffer(A)
   P = PtrArray(A)
   GC.@preserve b begin

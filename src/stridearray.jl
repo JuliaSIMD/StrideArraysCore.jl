@@ -128,6 +128,9 @@ end
 @inline function Base.similar(A::AbstractStrideArray{S,D,T}) where {S,D,T}
     StrideArray{T}(undef, size(A))
 end
+@inline function Base.similar(A::AbstractStrideArray, ::Type{T}) where {T}
+    StrideArray{T}(undef, size(A))
+end
 
 
 @inline function Base.view(A::StrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
