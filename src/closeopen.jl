@@ -1,12 +1,15 @@
 
 struct CloseOpen{L <: Union{Int,StaticInt}, U <: Union{Int,StaticInt}} <: AbstractUnitRange{Int}
-    start::L
-    upper::U
-    @inline CloseOpen(s::StaticInt{L}, u::StaticInt{U}) where {L,U} = new{StaticInt{L},StaticInt{U}}(s, u)
-    @inline CloseOpen(s::Integer, u::StaticInt{U}) where {U} = new{Int,StaticInt{U}}(s % Int, u)
-    @inline CloseOpen(s::StaticInt{L}, u::Integer) where {L} = new{StaticInt{L},Int}(s, u % Int)
-    @inline CloseOpen(s::Integer, u::Integer) = new{Int,Int}(s % Int, u % Int)
+  start::L
+  upper::U
+  @inline CloseOpen{L,U}(l::L,u::U) where {L <: Union{Int,StaticInt}, U <: Union{Int,StaticInt}} = new{L,U}(l,u)
 end
+@inline CloseOpen(s::StaticInt{L}, u::StaticInt{U}) where {L,U} = CloseOpen{StaticInt{L},StaticInt{U}}(s, u)
+@inline CloseOpen(s::Integer, u::StaticInt{U}) where {U} = CloseOpen{Int,StaticInt{U}}(s % Int, u)
+@inline CloseOpen(s::Int, u::StaticInt{U}) where {U} = CloseOpen{Int,StaticInt{U}}(s, u)
+@inline CloseOpen(s::StaticInt{L}, u::Integer) where {L} = CloseOpen{StaticInt{L},Int}(s, u % Int)
+@inline CloseOpen(s::StaticInt{L}, u::Int) where {L} = CloseOpen{StaticInt{L},Int}(s, u)
+@inline CloseOpen(s::Integer, u::Integer) = CloseOpen{Int,Int}(s % Int, u % Int)
 @inline CloseOpen(len::Integer) = CloseOpen(Zero(), len)
 
 @inline Base.first(r::CloseOpen{Int}) = getfield(r,:start)
