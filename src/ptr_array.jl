@@ -220,6 +220,7 @@ end
 #   q
 # end
 @generated function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
+  N == 0 && return Expr(:block, Expr(:meta,:inline), :(pointer(ptr)))
   if N ≠ NI
     if (N > NI) & (NI ≠ 1)
       throw(ArgumentError("If the dimension of the array exceeds the dimension of the index, then the index should be linear/one dimensional."))
