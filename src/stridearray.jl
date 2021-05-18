@@ -48,6 +48,7 @@ end
     StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
 end
 @inline StrideArray(::UndefInitializer, s::Vararg{Integer,N}) where {N} = StrideArray{Float64}(undef, s)
+@inline StrideArray(::UndefInitializer, s::Tuple{Vararg{Integer,N}}) where {N} = StrideArray{Float64}(undef, s)
 @inline StrideArray(::UndefInitializer, ::Type{T}, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(undef, s)
 @inline function StrideArray(A::PtrArray{S,D,T,N}, s::Tuple{Vararg{Integer,N}}) where {S,D,T,N}
   PtrArray(stridedpointer(A), s, val_dense_dims(A))
@@ -56,6 +57,33 @@ end
   StrideArray(PtrArray(stridedpointer(A), s, val_dense_dims(A)), preserve_buffer(A))
 end
 
+mutable struct StaticStrideArray{S,D,T,N,C,B,R,X,O,L} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
+  data::NTuple{L,T}
+  @inline StaticStrideArray{S,D,T,N,C,B,R,X,O}(::UndefInitializer) where {S,D,T,N,C,B,R,X,O} = new{S,D,T,N,C,B,R,X,O,Int(prod(to_static_tuple(Val(S))))}()
+  @inline StaticStrideArray{S,D,T,N,C,B,R,X,O,L}(::UndefInitializer) where {S,D,T,N,C,B,R,X,O,L} = new{S,D,T,N,C,B,R,X,O,L}()
+end
+
+@generated function to_static_tuple(::Val{S}) where {S}
+  t = Expr(:tuple)
+  for s ∈ S.parameters
+    push!(t.args, Expr(:new, s))
+  end
+  t
+end
+@inline ArrayInterface.size(::StaticStrideArray{S}) where {S} = to_static_tuple(Val(S))
+@inline ArrayInterface.strides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = VectorizationBase.fmap(>>>, to_static_tuple(Val(X)), VectorizationBase.intlog2(static_sizeof(T)))
+@inline VectorizationBase.bytestrides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = to_static_tuple(Val(X))
+@inline ArrayInterface.offsets(::StaticStrideArray{S,D,T,N,C,B,R,X,O}) where {S,D,T,N,C,B,R,X,O} = to_static_tuple(Val(O))
+@inline Base.unsafe_convert(::Type{Ptr{T}}, A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
+@inline Base.pointer(A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
+@inline StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T} = StaticStrideArray{T}(undef, s)
+@inline function StaticStrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T}
+  x, L = calc_strides_len(T,s)
+  R = ntuple(Int, Val(N))
+  O = ntuple(_ -> One(), Val(N))
+  Tshifter = VectorizationBase.intlog2(static_sizeof(T))
+  StaticStrideArray{typeof(s),VectorizationBase.unwrap(all_dense(Val(N))),T,N,1,0,R,typeof(x),typeof(O),Int(L >>> Tshifter)}(undef)
+end
 
 function dense_quote(N::Int, b::Bool)
     d = Expr(:tuple)
@@ -83,7 +111,7 @@ end
     for n ∈ 1:N
         push!(t.args, last_sx)
         new_sx = Symbol(:s_,n)
-        push!(q.args, Expr(:(=), new_sx, Expr(:call, :vmul_fast, last_sx, Expr(:ref, :s, n))))
+        push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:ref, :s, n))))
         last_sx = new_sx
     end
     push!(q.args, Expr(:tuple, t, last_sx))
@@ -114,6 +142,7 @@ end
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{Zero}) = r
 @inline zeroindex(A::PtrArray{S,D}) where {S,D} = PtrArray(zstridedpointer(A), size(A), Val{D}())
 @inline zeroindex(A::StrideArray) = StrideArray(zeroindex(PtrArray(A)), preserve_buffer(A))
+@inline zeroindex(A::StaticStrideArray) = StrideArray(zeroindex(PtrArray(A)), A)
 
 @generated rank_to_sortperm_val(::Val{R}) where {R} = :(Val{$(rank_to_sortperm(R))}())
 @inline function similar_layout(A::AbstractStrideArray{S,D,T,N,C,B,R}) where {S,D,T,N,C,B,R}

@@ -160,15 +160,16 @@ end
         @test StrideArraysCore.strides(A) === (StaticInt(1),3)
         @test StrideArraysCore.static_length(A) === 15
 
-        B = StrideArray{Float64}(undef, (StaticInt(3), 5));
+        B = StrideArray(undef, (StaticInt(3), 5));
         @test StrideArraysCore.strides(B) === (StaticInt(1), StaticInt(3))
         @test StrideArraysCore.size(B) === (StaticInt(3), 5);
         @test StrideArraysCore.static_length(B) === 15
 
-        D = StrideArray{Float64}(undef, (StaticInt(3), StaticInt(5)));
+        D = StrideArray(undef, (StaticInt(3), StaticInt(5)));
         @test StrideArraysCore.strides(D) === (StaticInt(1), StaticInt(3))
         @test StrideArraysCore.size(D) === (StaticInt(3), StaticInt(5));
         @test StrideArraysCore.static_length(D) === StaticInt(15)
+        @test D isa StrideArraysCore.StaticStrideArray
         for C ∈ [A,B,D]
             @test strides(C) === (1, 3)
             @test size(C) === (3, 5);

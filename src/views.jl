@@ -101,10 +101,10 @@ function view_quote(i, K, S, D, T, N, C, B, R, X, O, zero_offsets::Bool = false)
     end    
     quote
         $(Expr(:meta,:inline))
-        sp = A.ptr
-        s = A.size
-        x = sp.strd
-        o = sp.offsets
+        sp = stridedpointer(A)
+        s = size(A)
+        x = strides(sp)
+        o = offsets(sp)
         new_sp = StridedPointer{$T,$Nnew,$Cnew,$Bnew,$Rnew}(gep(sp, $inds), $x, $o)
         PtrArray(new_sp, $s, Val{$Dnew}())
     end
