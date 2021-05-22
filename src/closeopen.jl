@@ -1,23 +1,18 @@
 
-struct CloseOpen{L <: Union{Int,StaticInt}, U <: Union{Int,StaticInt}} <: AbstractUnitRange{Int}
+struct CloseOpen{L <: Integer, U <: Integer} <: AbstractUnitRange{Int}
   start::L
   upper::U
-  @inline CloseOpen{L,U}(l::L,u::U) where {L <: Union{Int,StaticInt}, U <: Union{Int,StaticInt}} = new{L,U}(l,u)
+  @inline CloseOpen{L,U}(l::L,u::U) where {L <: Integer, U <: Integer} = new{L,U}(l,u)
 end
-@inline CloseOpen(s::StaticInt{L}, u::StaticInt{U}) where {L,U} = CloseOpen{StaticInt{L},StaticInt{U}}(s, u)
-@inline CloseOpen(s::Integer, u::StaticInt{U}) where {U} = CloseOpen{Int,StaticInt{U}}(s % Int, u)
-@inline CloseOpen(s::Int, u::StaticInt{U}) where {U} = CloseOpen{Int,StaticInt{U}}(s, u)
-@inline CloseOpen(s::StaticInt{L}, u::Integer) where {L} = CloseOpen{StaticInt{L},Int}(s, u % Int)
-@inline CloseOpen(s::StaticInt{L}, u::Int) where {L} = CloseOpen{StaticInt{L},Int}(s, u)
-@inline CloseOpen(s::Integer, u::Integer) = CloseOpen{Int,Int}(s % Int, u % Int)
-@inline CloseOpen(len::Integer) = CloseOpen(Zero(), len)
+@inline CloseOpen(s::S, u::U) where {S,U} = CloseOpen{S,U}(s, u)
+@inline CloseOpen(len::T) where {T<:Integer} = CloseOpen{Zero,T}(Zero(), len)
 
-@inline Base.first(r::CloseOpen{Int}) = getfield(r,:start)
+@inline Base.first(r::CloseOpen) = getfield(r,:start) % Int
 @inline Base.first(r::CloseOpen{StaticInt{F}}) where {F} = F
 @inline Base.step(::CloseOpen) = One()
 # @inline Base.last(r::CloseOpen{<:Any,Int}) = getfield(r,:upper) - One()
-@inline Base.last(r::CloseOpen{<:Any,Int}) = getfield(r,:upper) - One()
-@inline Base.last(r::CloseOpen{<:Any,StaticInt{L}}) where {L} = L - 1
+@inline Base.last(r::CloseOpen{<:Integer,<:Integer}) = getfield(r,:upper)%Int - One()
+@inline Base.last(r::CloseOpen{<:Integer,StaticInt{L}}) where {L} = L - 1
 @inline ArrayInterface.static_first(r::CloseOpen) = getfield(r,:start)
 @inline ArrayInterface.static_last(r::CloseOpen) = getfield(r,:upper) - One()
 @inline Base.length(r::CloseOpen) = getfield(r,:upper) - getfield(r,:start)
