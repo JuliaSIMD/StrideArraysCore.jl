@@ -12,12 +12,12 @@ Base.size(::MemoryBuffer{L}) where L = (L,)
 # Base.IndexStyle(::Type{<:MemoryBuffer}) = Base.IndexLinear()
 @inline function Base.getindex(m::MemoryBuffer{L,T}, i::Int) where {L,T}
     @boundscheck checkbounds(m, i)
-    GC.@preserve m x = vload(pointer(m), VectorizationBase.lazymul(VectorizationBase.static_sizeof(T), i - one(i)))
+    GC.@preserve m x = vload(pointer(m), sizeof(T) * (i - one(i)))
     x
 end
 @inline function Base.setindex!(m::MemoryBuffer{L,T}, x, i::Int) where {L,T}
     @boundscheck checkbounds(m, i)
-    GC.@preserve m vstore!(pointer(m), convert(T, x), lazymul(static_sizeof(T), i - one(i)))
+    GC.@preserve m vstore!(pointer(m), convert(T, x), sizeof(T) * (i - one(i)))
 end
 
 @inline undef_memory_buffer(::Type{T}, ::StaticInt{L}) where {T,L} = MemoryBuffer{L,T}(undef)

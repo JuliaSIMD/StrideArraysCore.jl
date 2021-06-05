@@ -86,7 +86,7 @@ function ptrarray_densestride_quote(::Type{T}, N, stridedpointer_offsets) where 
         push!(d.args, true)
         n == N && break
         new_sx = Symbol(:s_,n)
-        push!(q.args, Expr(:(=), new_sx, Expr(:call, :vmul_fast, last_sx, Expr(:ref, :s, n))))
+        push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:call, GlobalRef(Core,:getfield), :s, n, false))))
         last_sx = new_sx
     end
     push!(q.args, :(PtrArray($stridedpointer_offsets(ptr, $t), s, Val{$d}())))
@@ -137,19 +137,14 @@ end
 # make the tuple homogenous before indexing
 @inline type_stable_select(t::Tuple, i::Integer) = map(Int, t)[i]
 
-@inline function ArrayInterface.axes(A::AbstractStrideVector, i::Integer)
-    if i == 1
-        o = type_stable_select(offsets(A), i)
-        s = type_stable_select(size(A), i)
-        return create_axis(s, o)
-    else
-        return One():1
-    end
-end
-@inline function ArrayInterface.axes(A::AbstractStrideArray, i::Integer)
+@inline function ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N}
+  if i > N
     o = type_stable_select(offsets(A), i)
     s = type_stable_select(size(A), i)
-    create_axis(s, o)
+    return create_axis(s, o)
+  else
+    return One():One()
+  end
 end
 @inline Base.axes(A::AbstractStrideArray, i::Integer) = axes(A, i)
 

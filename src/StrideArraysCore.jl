@@ -5,8 +5,9 @@ using ArrayInterface: StaticInt, Zero, One, StaticBool, True, False,
     OptionallyStaticUnitRange, size, strides, offsets, indices,
     static_length, static_first, static_last, axes,
     dense_dims, stride_rank
-using VectorizationBase: align, gep, AbstractStridedPointer, AbstractSIMDVector, vnoaliasstore!, staticm1,
-    static_sizeof, lazymul, vmul_fast, StridedPointer, gesp, zero_offsets, pause, zstridedpointer,
+using VectorizationBase: align, gep,
+  AbstractStridedPointer, AbstractSIMDVector, vnoaliasstore!, staticm1,
+    static_sizeof, StridedPointer, zstridedpointer,
     val_dense_dims, val_stride_rank, preserve_buffer
 
 export PtrArray, StrideArray, StaticInt
