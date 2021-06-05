@@ -138,7 +138,7 @@ end
 @inline type_stable_select(t::Tuple, i::Integer) = map(Int, t)[i]
 
 @inline function ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N}
-  if i > N
+  if i ≤ N
     o = type_stable_select(offsets(A), i)
     s = type_stable_select(size(A), i)
     return create_axis(s, o)
