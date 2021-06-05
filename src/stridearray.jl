@@ -162,16 +162,16 @@ end
 end
 
 
-@inline function Base.view(A::StrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
-    StrideArray(view(A.ptr, i...), A.data)
+@inline function Base.view(A::AbstractStrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
+    StrideArray(view(PtrArray(A), i...), preserve_buffer(A))
 end
-@inline function zview(A::StrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
-    StrideArray(zview(A.ptr, i...), A.data)
+@inline function zview(A::AbstractStrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
+    StrideArray(zview(PtrArray(A), i...), preserve_buffer(A))
 end
-@inline function Base.permutedims(A::StrideArray, ::Val{P}) where {P}
-    StrideArray(permutedims(A.ptr, Val{P}()), A.data)
+@inline function Base.permutedims(A::AbstractStrideArray, ::Val{P}) where {P}
+    StrideArray(permutedims(PtrArray(A), Val{P}()), preserve_buffer(A))
 end
-@inline Base.adjoint(a::StrideVector) = StrideArray(adjoint(a.ptr), a.data)
+@inline Base.adjoint(a::AbstractStrideVector) = StrideArray(adjoint(PtrArray(a)), preserve_buffer(a))
 
 
 function gc_preserve_call(ex, skip=0)
