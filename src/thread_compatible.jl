@@ -6,21 +6,21 @@ end
 
 @inline dereference(r::Reference) = getfield(r, :data)
 @inline dereference(r) = r
-@inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{Reference{T}}, i) where {T}
+@inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{Reference{T}}, i::Int) where {T}
     i, ref = ThreadingUtilities.load(p, Ptr{Reference{T}}, i)
     i, getfield(Base.unsafe_pointer_to_objref(ref)::Reference{T}, :data)::T
     # i, getfield(unsafe_load(ref)::Reference{T}, :data)::T
 end
-@inline function ThreadingUtilities.store!(p::Ptr{UInt}, r::Reference, i)
+@inline function ThreadingUtilities.store!(p::Ptr{UInt}, r::Reference, i::Int)
     ThreadingUtilities.store!(p + i, reinterpret(UInt, pointer_from_objref(r)))
     i + sizeof(UInt)
 end
-@inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{PtrArray{S,D,T,N,C,B,R,X,O}}, i) where {S,D,T,N,C,B,R,X,O}
+@inline function ThreadingUtilities.load(p::Ptr{UInt}, ::Type{PtrArray{S,D,T,N,C,B,R,X,O}}, i::Int) where {S,D,T,N,C,B,R,X,O}
     (i, sp) = ThreadingUtilities.load(p, StridedPointer{T,N,C,B,R,X,O}, i)
     (i, sz) = ThreadingUtilities.load(p, S, i)
     i, PtrArray(sp, sz, Val{D}())
 end
-@inline function ThreadingUtilities.store!(p::Ptr{UInt}, A::PtrArray, i)
+@inline function ThreadingUtilities.store!(p::Ptr{UInt}, A::PtrArray, i::Int)
     i = ThreadingUtilities.store!(p, stridedpointer(A), i)
     ThreadingUtilities.store!(p, size(A), i)
 end
