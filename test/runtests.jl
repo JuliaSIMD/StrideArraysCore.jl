@@ -122,7 +122,7 @@ end
         pht, ght = StrideArraysCore.object_and_preserve((3,greet[1]))
         GC.@preserve xu gt gg gh ght begin
             ThreadingUtilities.store!(pointer(xu), pt, 0)
-            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pt), 0)) === (sizeof(UInt), t)
+            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pt), 0)) == (6sizeof(UInt), t)
             offset = sizeof(UInt)
             for a ∈ t
                 _p, g = StrideArraysCore.object_and_preserve(a)
@@ -139,7 +139,7 @@ end
             ThreadingUtilities.store!(pointer(xu), ph, offset)
             @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(ph), offset)) === (offset+sizeof(UInt), greet[1])
             ThreadingUtilities.store!(pointer(xu), pht, offset)
-            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pht), offset)) === (offset+sizeof(UInt), (3,greet[1]))
+            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pht), offset)) === (offset+2sizeof(UInt), (3,greet[1]))
         end
 
         greetsa = StrideArray(greet);
