@@ -9,6 +9,7 @@ using VectorizationBase: align, gep,
   AbstractStridedPointer, AbstractSIMDVector, vnoaliasstore!, staticm1,
     static_sizeof, StridedPointer, zstridedpointer,
     val_dense_dims, val_stride_rank, preserve_buffer
+using ManualMemory
 
 export PtrArray, StrideArray, StaticInt
 
@@ -19,8 +20,8 @@ include("thread_compatible.jl")
 include("views.jl")
 include("adjoints.jl")
 
-function __init__()
-    # @require LoopVectorization="bdcacae8-1622-11e9-2a5c-532679323890" @eval using StrideArrays
-end
+# function __init__()
+#     # @require LoopVectorization="bdcacae8-1622-11e9-2a5c-532679323890" @eval using StrideArrays
+# end
 
 end
