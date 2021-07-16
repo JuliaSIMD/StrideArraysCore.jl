@@ -295,3 +295,31 @@ end
 end
 
 
+@inline function Base.getindex(A::PtrVector{S,D,T}, i::Integer) where {S,D,T}
+  @boundscheck checkbounds(A, i)
+  pload(pointer(A) + (i-oneunit(i))*only(VectorizationBase.bytestrides(A)))
+end
+@inline function Base.getindex(A::AbstractStrideVector{S,D,T}, i::Integer) where {S,D,T}
+  b = preserve_buffer(A)
+  P = PtrArray(A)
+  GC.@preserve b begin
+    @boundscheck checkbounds(P, i)
+    pload(pointer(A) + (i-oneunit(i))*only(VectorizationBase.bytestrides(A)))
+  end
+end
+@inline function Base.setindex!(A::PtrVector{S,D,T}, v, i::Integer) where {S,D,T}
+  @boundscheck checkbounds(A, i)
+  pstore!(pointer(A) + (i-oneunit(i))*only(VectorizationBase.bytestrides(A)), v)
+  v
+end
+@inline function Base.setindex!(A::AbstractStrideVector{S,D,T}, v, i::Integer) where {S,D,T}
+  b = preserve_buffer(A)
+  P = PtrArray(A)
+  GC.@preserve b begin
+    @boundscheck checkbounds(P, i)
+    pstore!(pointer(A) + (i-oneunit(i))*only(VectorizationBase.bytestrides(A)), v)
+  end
+  v
+end
+
+
