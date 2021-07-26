@@ -322,4 +322,101 @@ end
   v
 end
 
+@generated function Base.reinterpret(::Type{Tnew}, A::PtrArray{S,D,Told,N,C,B,R}) where {S,D,Told,Tnew,N,C,B,R}
+  sz_old = sizeof(Told)
+  sz_new = sizeof(Tnew)
+  if sz_old == sz_new
+    size_expr = :size_A
+    bs_expr = :bs
+  else
+    @assert 1 ≤ C ≤ N
+    size_expr = Expr(:tuple)
+    bs_expr = Expr(:tuple)
+    for n ∈ 1:N
+      sz_n = Expr(:call, GlobalRef(Core,:getfield), :size_A, n, false)
+      bs_n = Expr(:call, GlobalRef(Core,:getfield), :bs, n, false)
+      if n ≠ C
+        push!(size_expr.args, sz_n)
+        push!(bs_expr.args, bs_n)
+      elseif sz_old > sz_new
+        si = :(StaticInt{$(sz_old ÷ sz_new)}())
+        push!(size_expr.args, Expr(:call, :*, sz_n, si))
+        push!(bs_expr.args, Expr(:call, :÷, bs_n, si))
+      else
+        si = :(StaticInt{$(sz_new ÷ sz_old)}())
+        push!(size_expr.args, Expr(:call, :÷, sz_n, si))
+        push!(bs_expr.args, Expr(:call, :*, sz_n, si))
+      end
+    end
+  end
+  sp_expr = :(stridedpointer(reinterpret(Ptr{$Tnew}, pointer(sp)), StaticInt{$C}(), StaticInt{$B}(), Val{$R}(), $bs_expr, offsets(sp)))
+  ex = :(PtrArray($sp_expr, $size_expr, Val{$D}()))
+  Expr(:block, Expr(:meta,:inline), :(sp = stridedpointer(A)), :(bs = VectorizationBase.bytestrides(sp)), :(size_A = size(A)), ex)
+end
+@generated function Base.reinterpret(::typeof(reshape), ::Type{Tnew}, A::PtrArray{S,D,Told,N,C,B,R}) where {S,D,Told,Tnew,N,C,B,R}
+  sz_old = sizeof(Told)
+  sz_new = sizeof(Tnew)
+  q = Expr(:block, Expr(:meta,:inline), :(sp = stridedpointer(A)), :(bs = VectorizationBase.bytestrides(sp)), :(size_A = size(A)), :(offs = offsets(sp)))
+  sz_old < sz_new && push!(q.args, :(@assert size_A[$C] == $(sz_new ÷ sz_old)))
+  if sz_old == sz_new
+    size_expr = :size_A
+    bs_expr = :bs
+    offs_expr = :offs
+    Rnew = R
+    Cnew = C
+    Dnew = D
+  else
+    @assert 1 ≤ C ≤ N
+    size_expr = Expr(:tuple)
+    bs_expr = Expr(:tuple)
+    offs_expr = Expr(:tuple)
+    Rnew = Expr(:tuple)
+    Dnew = Expr(:tuple)
+    for n ∈ 1:N
+      sz_n = Expr(:call, GlobalRef(Core,:getfield), :size_A, n, false)
+      bs_n = Expr(:call, GlobalRef(Core,:getfield), :bs, n, false)
+      of_n = Expr(:call, GlobalRef(Core,:getfield), :offs, n, false)
+      if n ≠ C
+        push!(size_expr.args, sz_n)
+        push!(bs_expr.args, bs_n)
+        push!(offs_expr.args, of_n)
+        push!(Dnew.args, D[n])
+        r = R[n]
+        r = if sz_old > sz_new
+          r += r > C
+        elseif sz_old < sz_new
+          r -= r > C
+        end
+        push!(Rnew.args, r)
+      elseif sz_old > sz_new
+        si = :(StaticInt{$(sz_old ÷ sz_new)}())
+        push!(size_expr.args, si, sz_n)
+        push!(bs_expr.args, Expr(:call, :÷, bs_n, si), bs_n)        
+        push!(offs_expr.args, :(One()), of_n)
+        push!(Dnew.args, true, D[n])
+        push!(Rnew.args, 1, 1+R[n])
+        Cnew = C
+      else
+        # si = :(StaticInt{$(sz_new ÷ sz_old)}())
+        # push!(size_expr.args, Expr(:call, :÷, sz_n, si))
+        # push!(bs_expr.args, Expr(:call, :*, sz_n, si))
+        R2ind = findfirst(==(2), R)
+        Cnew = if R2ind === nothing
+          0
+        elseif D[R2ind]
+          R2ind-1
+        else
+          0
+        end
+      end
+    end
+  end
+  sp_expr = :(stridedpointer(reinterpret(Ptr{$Tnew}, pointer(sp)), StaticInt{$Cnew}(), StaticInt{$B}(), Val{$Rnew}(), $bs_expr, $offs_expr))
+  ex = :(PtrArray($sp_expr, $size_expr, Val{$Dnew}()))
+  push!(q.args, ex)
+  q
+end
+@inline Base.reinterpret(::Type{T}, A::AbstractStrideArray) where {T} = StrideArray(reinterpret(T, PtrArray(A)), preserve_buffer(A))
+@inline Base.reinterpret(::typeof(reshape), ::Type{T}, A::AbstractStrideArray) where {T} = StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
+
 

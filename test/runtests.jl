@@ -2,18 +2,18 @@ using StrideArraysCore, ThreadingUtilities, Aqua
 using Test
 
 function closeopensum(x)
-    s = zero(eltype(x))
-    @inbounds @simd for i ∈ StrideArraysCore.CloseOpen(length(x))
-        s += x[i+1]
-    end
-    s
+  s = zero(eltype(x))
+  @inbounds @simd for i ∈ StrideArraysCore.CloseOpen(length(x))
+    s += x[i+1]
+  end
+  s
 end
 function closeopensumfastmath(x)
-    s = zero(eltype(x))
-    @inbounds @fastmath for i ∈ StrideArraysCore.CloseOpen(length(x))
-        s += x[i+1]
-    end
-    s
+  s = zero(eltype(x))
+  @inbounds @fastmath for i ∈ StrideArraysCore.CloseOpen(length(x))
+    s += x[i+1]
+  end
+  s
 end
 function cartesianindexsum(A)
   s = zero(eltype(A))
@@ -25,160 +25,165 @@ end
 
 @testset "StrideArraysCore.jl" begin
 
-    Aqua.test_all(StrideArraysCore)
+  Aqua.test_all(StrideArraysCore)
 
-    @testset "StrideArrays Basic" begin
-        A = rand(100, 100);
-        B = copy(A);
-        C = StrideArraysCore.PtrArray(A);
-        @test similar(C) isa StrideArraysCore.StrideArray
-        let D = similar(C,Float32)
-            @test D isa StrideArraysCore.StrideArray
-            @test eltype(D) === Float32
-        end
-        GC.@preserve A begin
-            @test closeopensum(C) == closeopensum(A)
-            @test closeopensumfastmath(C) == closeopensumfastmath(A)
-            @test sum(C) == sum(A)
-            @test closeopensum(C) ≈ closeopensumfastmath(C) ≈ sum(C)
-            @test A == B
-            C .*= 3;
-            @test A == 3 .* B
-            @test C == A
-            @test C == 3 .* B
-
-            D = copy(A);
-            Cslice = view(C, 23:48, 17:89)
-            Cslice .= 2;
-            @test D != C
-            D[23:48,17:89] .= 2;
-            @test D == C
-            @test C === view(C, :, :)
-            @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
-            @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
-            @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
-            @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
-
-            @test C  isa PtrArray
-            @test C' isa PtrArray
-            @test @inferred(permutedims(C, Val((2,1)))) isa PtrArray
-            @test @inferred(adjoint(C)) == D'
-            @test @inferred(axes(C)) == axes(D)
-            @test @inferred(axes(C')) == axes(D')
-            @test @inferred(eachindex(view(C, :, 2:6))) == 1:(5*size(C,1))
-            @test @inferred(eachindex(view(C', 2:6, :)')) == 1:(5*size(C,1))
-            @test @inferred(eachindex(view(C, 2:6, :))) == CartesianIndices((5, size(C,2)))
-            @test @inferred(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1))) === StrideArraysCore.CloseOpen(StaticInt(5))
-            @test @inferred(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1))) === StrideArraysCore.CloseOpen(StaticInt(5))
-            @test @inferred(length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))) === StaticInt(5)
-            @test @inferred(length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), 1))) === 5
-            ax1, ax2 = axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :))
-            @test StrideArraysCore.ArrayInterface.known_length(ax1) == 5
-            @test StrideArraysCore.ArrayInterface.known_length(ax2) === nothing
-            @test StrideArraysCore.ArrayInterface.known_first(ax1) == 0
-            @test StrideArraysCore.ArrayInterface.known_first(ax2) == 0
-            @test StrideArraysCore.ArrayInterface.known_step(ax1) == 1
-            @test StrideArraysCore.ArrayInterface.known_step(ax2) == 1
-            @test StrideArraysCore.ArrayInterface.known_last(ax1) == 4
-            @test StrideArraysCore.ArrayInterface.known_last(ax2) === nothing
-        end
-        W = rand(2,3,4);
-        X = PtrArray(W);
-        GC.@preserve W begin
-            @test W == X
-            @test permutedims(W, (1,2,3)) == @inferred(permutedims(X, Val((1,2,3))))
-            @test permutedims(W, (1,3,2)) == @inferred(permutedims(X, Val((1,3,2))))
-            @test permutedims(W, (2,1,3)) == @inferred(permutedims(X, Val((2,1,3))))
-            @test permutedims(W, (2,3,1)) == @inferred(permutedims(X, Val((2,3,1))))
-            @test permutedims(W, (3,1,2)) == @inferred(permutedims(X, Val((3,1,2))))
-            @test permutedims(W, (3,2,1)) == @inferred(permutedims(X, Val((3,2,1))))
-            @test_throws BoundsError X[length(X) + 1]
-            @test_throws BoundsError X[-4]
-            @test_throws BoundsError X[2,5,3]
-            @test cartesianindexsum(W) ≈ cartesianindexsum(X)
-            @test iszero(@allocated cartesianindexsum(X))
-        end
-        @test X === PtrArray(pointer(X), size(X))
-        y = rand(77);
-        GC.@preserve y begin
-            z = PtrArray(y);
-            @test y == z
-            @test y' == z'
-            @test PtrArray(y') === z'
-            @test PtrArray(transpose(y)) === transpose(PtrArray(y))
-            @test pointer(y) === pointer(z)
-            @test_throws BoundsError z[-8]
-            @test_throws BoundsError z[88]
-        end
+  @testset "StrideArrays Basic" begin
+    Acomplex = @StrideArray rand(Complex{Float64}, 4, 5);
+    @test StrideArray(Acomplex) ===  reinterpret(reshape, Complex{Float64}, reinterpret(reshape, Float64, Acomplex))
+    @test StrideArray(Acomplex) ===  reinterpret(reshape, Complex{Float64}, reinterpret(reshape, Complex{UInt64}, Acomplex))
+    @test StrideArraysCore.size(Acomplex) === StrideArraysCore.size(StrideArray(Acomplex)) === (StaticInt(4),StaticInt(5))
+    @test StrideArraysCore.size(reinterpret(reshape, Float64, Acomplex)) === (StaticInt(2),StaticInt(4),StaticInt(5))
+    A = rand(100, 100);
+    B = copy(A);
+    C = StrideArraysCore.PtrArray(A);
+    @test similar(C) isa StrideArraysCore.StrideArray
+    let D = similar(C,Float32)
+      @test D isa StrideArraysCore.StrideArray
+      @test eltype(D) === Float32
     end
-    @testset "ThreadingUtilities" begin
-        xu = zeros(UInt, 100);
-        x = rand(100); y = rand(100); z = rand(100);
-        t = (x,y,z)
-        pt, gt = StrideArraysCore.object_and_preserve(t)
-        greet = ["Hello", "world", "hang", "in", "there"]
-        pg, gg = StrideArraysCore.object_and_preserve(greet)
-        ph, gh = StrideArraysCore.object_and_preserve(greet[1])
-        pht, ght = StrideArraysCore.object_and_preserve((3,greet[1]))
-        GC.@preserve xu gt gg gh ght begin
-            ThreadingUtilities.store!(pointer(xu), pt, 0)
-            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pt), 0)) == (6sizeof(UInt), t)
-            offset = sizeof(UInt)
-            for a ∈ t
-                _p, g = StrideArraysCore.object_and_preserve(a)
-                ThreadingUtilities.store!(pointer(xu), _p, offset)
-                offset, p = @inferred(ThreadingUtilities.load(pointer(xu), typeof(_p), offset))
-                @test g === a
-                @test p isa PtrArray
-                @test pointer(p) === pointer(a)
-                @test p !== a
-                @test p == a
-            end
-            ThreadingUtilities.store!(pointer(xu), pg, offset)
-            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pg), offset)) === (offset+sizeof(UInt), greet)
-            ThreadingUtilities.store!(pointer(xu), ph, offset)
-            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(ph), offset)) === (offset+sizeof(UInt), greet[1])
-            ThreadingUtilities.store!(pointer(xu), pht, offset)
-            @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pht), offset)) === (offset+2sizeof(UInt), (3,greet[1]))
-        end
+    GC.@preserve A begin
+      @test closeopensum(C) == closeopensum(A)
+      @test closeopensumfastmath(C) == closeopensumfastmath(A)
+      @test sum(C) == sum(A)
+      @test closeopensum(C) ≈ closeopensumfastmath(C) ≈ sum(C)
+      @test A == B
+      C .*= 3;
+      @test A == 3 .* B
+      @test C == A
+      @test C == 3 .* B
 
-        greetsa = StrideArray(greet);
-        @test greetsa == greet
-        greetsa[1] = "howdy"
-        greetsa[5] = "there!"
-        @test greet[1] == "howdy"
-        @test greet[5] == "there!"
-        A = rand(ComplexF64, 4, 5);
-        Asa = StrideArray(A);
-        @test A == Asa
-        Asa[3,4] = 1234.5 + 678.9im;
-        @test A[3,4] == 1234.5 + 678.9im;
+      D = copy(A);
+      Cslice = view(C, 23:48, 17:89)
+      Cslice .= 2;
+      @test D != C
+      D[23:48,17:89] .= 2;
+      @test D == C
+      @test C === view(C, :, :)
+      @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
+      @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
+      @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
+      @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
+
+      @test C  isa PtrArray
+      @test C' isa PtrArray
+      @test @inferred(permutedims(C, Val((2,1)))) isa PtrArray
+      @test @inferred(adjoint(C)) == D'
+      @test @inferred(axes(C)) == axes(D)
+      @test @inferred(axes(C')) == axes(D')
+      @test @inferred(eachindex(view(C, :, 2:6))) == 1:(5*size(C,1))
+      @test @inferred(eachindex(view(C', 2:6, :)')) == 1:(5*size(C,1))
+      @test @inferred(eachindex(view(C, 2:6, :))) == CartesianIndices((5, size(C,2)))
+      @test @inferred(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1))) === StrideArraysCore.CloseOpen(StaticInt(5))
+      @test @inferred(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1))) === StrideArraysCore.CloseOpen(StaticInt(5))
+      @test @inferred(length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))) === StaticInt(5)
+      @test @inferred(length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), 1))) === 5
+      ax1, ax2 = axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :))
+      @test StrideArraysCore.ArrayInterface.known_length(ax1) == 5
+      @test StrideArraysCore.ArrayInterface.known_length(ax2) === nothing
+      @test StrideArraysCore.ArrayInterface.known_first(ax1) == 0
+      @test StrideArraysCore.ArrayInterface.known_first(ax2) == 0
+      @test StrideArraysCore.ArrayInterface.known_step(ax1) == 1
+      @test StrideArraysCore.ArrayInterface.known_step(ax2) == 1
+      @test StrideArraysCore.ArrayInterface.known_last(ax1) == 4
+      @test StrideArraysCore.ArrayInterface.known_last(ax2) === nothing
     end
-    @testset "StrideArrays Initialization" begin
-        A = StrideArray{Float64}(undef, (3, 5));
-        @test StrideArraysCore.size(A) === (3, 5)
-        @test StrideArraysCore.strides(A) === (StaticInt(1),3)
-        @test StrideArraysCore.static_length(A) === 15
-
-        B = StrideArray(undef, (StaticInt(3), 5));
-        @test StrideArraysCore.strides(B) === (StaticInt(1), StaticInt(3))
-        @test StrideArraysCore.size(B) === (StaticInt(3), 5);
-        @test StrideArraysCore.static_length(B) === 15
-
-        D = StrideArray(undef, (StaticInt(3), StaticInt(5)));
-        @test StrideArraysCore.strides(D) === (StaticInt(1), StaticInt(3))
-        @test StrideArraysCore.size(D) === (StaticInt(3), StaticInt(5));
-        @test StrideArraysCore.static_length(D) === StaticInt(15)
-        @test D isa StrideArraysCore.StaticStrideArray
-        for C ∈ [A,B,D]
-            @test strides(C) === (1, 3)
-            @test size(C) === (3, 5);
-            @test StrideArraysCore.offsets(C) === (StaticInt(1),StaticInt(1))
-            @test StrideArraysCore.offsets(StrideArraysCore.zeroindex(C)) === (StaticInt(0),StaticInt(0))
-            C[2,3] = 4
-            StrideArraysCore.zeroindex(C)[2,3] = -10
-            @test C[2,3] === StrideArraysCore.zeroindex(C)[1,2] === 4.0
-            @test C[3,4] === StrideArraysCore.zeroindex(C)[2,3] === -10.0
-        end
+    W = rand(2,3,4);
+    X = PtrArray(W);
+    GC.@preserve W begin
+      @test W == X
+      @test permutedims(W, (1,2,3)) == @inferred(permutedims(X, Val((1,2,3))))
+      @test permutedims(W, (1,3,2)) == @inferred(permutedims(X, Val((1,3,2))))
+      @test permutedims(W, (2,1,3)) == @inferred(permutedims(X, Val((2,1,3))))
+      @test permutedims(W, (2,3,1)) == @inferred(permutedims(X, Val((2,3,1))))
+      @test permutedims(W, (3,1,2)) == @inferred(permutedims(X, Val((3,1,2))))
+      @test permutedims(W, (3,2,1)) == @inferred(permutedims(X, Val((3,2,1))))
+      @test_throws BoundsError X[length(X) + 1]
+      @test_throws BoundsError X[-4]
+      @test_throws BoundsError X[2,5,3]
+      @test cartesianindexsum(W) ≈ cartesianindexsum(X)
+      @test iszero(@allocated cartesianindexsum(X))
     end
+    @test X === PtrArray(pointer(X), size(X))
+    y = rand(77);
+    GC.@preserve y begin
+      z = PtrArray(y);
+      @test y == z
+      @test y' == z'
+      @test PtrArray(y') === z'
+      @test PtrArray(transpose(y)) === transpose(PtrArray(y))
+      @test pointer(y) === pointer(z)
+      @test_throws BoundsError z[-8]
+      @test_throws BoundsError z[88]
+    end
+  end
+  @testset "ThreadingUtilities" begin
+    xu = zeros(UInt, 100);
+    x = rand(100); y = rand(100); z = rand(100);
+    t = (x,y,z)
+    pt, gt = StrideArraysCore.object_and_preserve(t)
+    greet = ["Hello", "world", "hang", "in", "there"]
+    pg, gg = StrideArraysCore.object_and_preserve(greet)
+    ph, gh = StrideArraysCore.object_and_preserve(greet[1])
+    pht, ght = StrideArraysCore.object_and_preserve((3,greet[1]))
+    GC.@preserve xu gt gg gh ght begin
+      ThreadingUtilities.store!(pointer(xu), pt, 0)
+      @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pt), 0)) == (6sizeof(UInt), t)
+      offset = sizeof(UInt)
+      for a ∈ t
+        _p, g = StrideArraysCore.object_and_preserve(a)
+        ThreadingUtilities.store!(pointer(xu), _p, offset)
+        offset, p = @inferred(ThreadingUtilities.load(pointer(xu), typeof(_p), offset))
+        @test g === a
+        @test p isa PtrArray
+        @test pointer(p) === pointer(a)
+        @test p !== a
+        @test p == a
+      end
+      ThreadingUtilities.store!(pointer(xu), pg, offset)
+      @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pg), offset)) === (offset+sizeof(UInt), greet)
+      ThreadingUtilities.store!(pointer(xu), ph, offset)
+      @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(ph), offset)) === (offset+sizeof(UInt), greet[1])
+      ThreadingUtilities.store!(pointer(xu), pht, offset)
+      @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pht), offset)) === (offset+2sizeof(UInt), (3,greet[1]))
+    end
+
+    greetsa = StrideArray(greet);
+    @test greetsa == greet
+    greetsa[1] = "howdy"
+    greetsa[5] = "there!"
+    @test greet[1] == "howdy"
+    @test greet[5] == "there!"
+    A = rand(ComplexF64, 4, 5);
+    Asa = StrideArray(A);
+    @test A == Asa
+    Asa[3,4] = 1234.5 + 678.9im;
+    @test A[3,4] == 1234.5 + 678.9im;
+  end
+  @testset "StrideArrays Initialization" begin
+    A = StrideArray{Float64}(undef, (3, 5));
+    @test StrideArraysCore.size(A) === (3, 5)
+    @test StrideArraysCore.strides(A) === (StaticInt(1),3)
+    @test StrideArraysCore.static_length(A) === 15
+
+    B = StrideArray(undef, (StaticInt(3), 5));
+    @test StrideArraysCore.strides(B) === (StaticInt(1), StaticInt(3))
+    @test StrideArraysCore.size(B) === (StaticInt(3), 5);
+    @test StrideArraysCore.static_length(B) === 15
+
+    D = StrideArray(undef, (StaticInt(3), StaticInt(5)));
+    @test StrideArraysCore.strides(D) === (StaticInt(1), StaticInt(3))
+    @test StrideArraysCore.size(D) === (StaticInt(3), StaticInt(5));
+    @test StrideArraysCore.static_length(D) === StaticInt(15)
+    @test D isa StrideArraysCore.StaticStrideArray
+    for C ∈ [A,B,D]
+      @test strides(C) === (1, 3)
+      @test size(C) === (3, 5);
+      @test StrideArraysCore.offsets(C) === (StaticInt(1),StaticInt(1))
+      @test StrideArraysCore.offsets(StrideArraysCore.zeroindex(C)) === (StaticInt(0),StaticInt(0))
+      C[2,3] = 4
+      StrideArraysCore.zeroindex(C)[2,3] = -10
+      @test C[2,3] === StrideArraysCore.zeroindex(C)[1,2] === 4.0
+      @test C[3,4] === StrideArraysCore.zeroindex(C)[2,3] === -10.0
+    end
+  end
 end
