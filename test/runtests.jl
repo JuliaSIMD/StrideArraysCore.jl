@@ -28,7 +28,8 @@ end
   Aqua.test_all(StrideArraysCore)
 
   @testset "StrideArrays Basic" begin
-    Acomplex = @StrideArray rand(Complex{Float64}, 4, 5);
+    Acomplex = StrideArray{Complex{Float64}}(undef, (StaticInt(4), StaticInt(5)))
+    Acomplex .= rand.(Complex{Float64})
     @test StrideArray(Acomplex) ===  reinterpret(reshape, Complex{Float64}, reinterpret(reshape, Float64, Acomplex))
     @test StrideArray(Acomplex) ===  reinterpret(reshape, Complex{Float64}, reinterpret(reshape, Complex{UInt64}, Acomplex))
     @test StrideArraysCore.size(Acomplex) === StrideArraysCore.size(StrideArray(Acomplex)) === (StaticInt(4),StaticInt(5))
