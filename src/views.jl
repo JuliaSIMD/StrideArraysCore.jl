@@ -13,12 +13,6 @@ end
 rank_to_sortperm(R) = sortperm(R)
 
 
-# @inline function gep_no_offset(ptr::VectorizationBase.AbstractStridedPointer, i::Tuple)
-    # VectorizationBase.gep(pointer(ptr), VectorizationBase.tdot(ptr, i, VectorizationBase.strides(ptr), VectorizationBase.nopromote_axis_indicator(ptr)))
-# end
-# @inline function similar_with_offset(sptr::StridedPointer{T,N,C,B,R,X,O}, ptr::Ptr{T}) where {T,N,C,B,R,X,O}
-#     StridedPointer{T,N,C,B,R,X}(ptr, sptr.strd, zerotuple(Val{N}()))
-# end
 function view_quote(i, K, S, D, T, N, C, B, R, X, O, zero_offsets::Bool = false)
     @assert ((K == N) || isone(K))
 
@@ -105,7 +99,7 @@ function view_quote(i, K, S, D, T, N, C, B, R, X, O, zero_offsets::Bool = false)
         s = size(A)
         x = strides(sp)
         o = offsets(sp)
-        new_sp = StridedPointer{$T,$Nnew,$Cnew,$Bnew,$Rnew}(gep(sp, $inds), $x, $o)
+        new_sp = StridedPointer{$T,$Nnew,$Cnew,$Bnew,$Rnew}(_offset_ptr(sp, $inds), $x, $o)
         PtrArray(new_sp, $s, Val{$Dnew}())
     end
 end
@@ -119,7 +113,7 @@ end
 
 @inline function Base.vec(A::PtrArray{S,D,T,N,C,0}) where {S,D,T,N,C}
     @assert all(D) "All dimensions must be dense for a vec view. Try `vec(copy(A))` instead."
-    sp = StridedPointer(pointer(A), (VectorizationBase.static_sizeof(T),), (One(),))
+    sp = StridedPointer(pointer(A), (static_sizeof(T),), (One(),))
     PtrArray(sp, (static_length(A),), Val((true,)))
 end
 

@@ -1,18 +1,22 @@
 module StrideArraysCore
 
-using VectorizationBase, ArrayInterface, ThreadingUtilities
+using LayoutPointers, ArrayInterface, ThreadingUtilities, ManualMemory
 using ArrayInterface: StaticInt, Zero, One, StaticBool, True, False,
     OptionallyStaticUnitRange, size, strides, offsets, indices,
     static_length, static_first, static_last, axes,
-    dense_dims, stride_rank
-using VectorizationBase: align, gep,
-  AbstractStridedPointer, AbstractSIMDVector, vnoaliasstore!, staticm1,
-    static_sizeof, StridedPointer, zstridedpointer,
-    val_dense_dims, val_stride_rank, preserve_buffer
-using ManualMemory
+    dense_dims, stride_rank, StrideIndex, offset1
+using LayoutPointers:
+  AbstractStridedPointer,
+  StridedPointer, zstridedpointer,
+  val_dense_dims, val_stride_rank
+
+using ManualMemory: preserve_buffer
+
+using SIMDTypes: NativeTypes
 
 export PtrArray, StrideArray, StaticInt
 
+@generated static_sizeof(::Type{T}) where {T} = :(StaticInt{$(Base.allocatedinline(T) ? sizeof(T) : sizeof(Int))}())
 include("closeopen.jl")
 include("ptr_array.jl")
 include("stridearray.jl")

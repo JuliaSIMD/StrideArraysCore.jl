@@ -28,7 +28,7 @@ struct StrideArray{S,D,T,N,C,B,R,X,O,A} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O
     data::A
 end
 
-@inline VectorizationBase.stridedpointer(A::StrideArray) = A.ptr.ptr
+@inline LayoutPointers.stridedpointer(A::StrideArray) = A.ptr.ptr
 
 const StrideVector{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,1,C,B,R,X,O,A}
 const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
@@ -40,7 +40,7 @@ const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
     b = undef_memory_buffer(T, L ÷ static_sizeof(T))
     # For now, just trust Julia's alignment heuristics are doing the right thing
     # to save us from having to over-allocate
-    # ptr = VectorizationBase.align(pointer(b))
+    # ptr = LayoutPointers.align(pointer(b))
     ptr = pointer(b)
     StrideArray(ptr, s, x, b, all_dense(Val{N}()))
 end
@@ -71,8 +71,8 @@ end
   t
 end
 @inline ArrayInterface.size(::StaticStrideArray{S}) where {S} = to_static_tuple(Val(S))
-@inline ArrayInterface.strides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = VectorizationBase.fmap(>>>, to_static_tuple(Val(X)), VectorizationBase.intlog2(static_sizeof(T)))
-@inline VectorizationBase.bytestrides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = to_static_tuple(Val(X))
+@inline ArrayInterface.strides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = LayoutPointers.fmap(>>>, to_static_tuple(Val(X)), LayoutPointers.intlog2(static_sizeof(T)))
+@inline LayoutPointers.bytestrides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = to_static_tuple(Val(X))
 @inline ArrayInterface.offsets(::StaticStrideArray{S,D,T,N,C,B,R,X,O}) where {S,D,T,N,C,B,R,X,O} = to_static_tuple(Val(O))
 @inline Base.unsafe_convert(::Type{Ptr{T}}, A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
 @inline Base.pointer(A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
@@ -81,8 +81,8 @@ end
   x, L = calc_strides_len(T,s)
   R = ntuple(Int, Val(N))
   O = ntuple(_ -> One(), Val(N))
-  Tshifter = VectorizationBase.intlog2(static_sizeof(T))
-  StaticStrideArray{typeof(s),VectorizationBase.unwrap(all_dense(Val(N))),T,N,1,0,R,typeof(x),typeof(O),Int(L >>> Tshifter)}(undef)
+  Tshifter = LayoutPointers.intlog2(static_sizeof(T))
+  StaticStrideArray{typeof(s),LayoutPointers.unwrap(all_dense(Val(N))),T,N,1,0,R,typeof(x),typeof(O),Int(L >>> Tshifter)}(undef)
 end
 
 function dense_quote(N::Int, b::Bool)
@@ -118,8 +118,8 @@ end
     q
 end
 
-@inline VectorizationBase.preserve_buffer(A::MemoryBuffer) = A
-@inline VectorizationBase.preserve_buffer(A::StrideArray) = preserve_buffer(getfield(A, :data))
+@inline LayoutPointers.preserve_buffer(A::MemoryBuffer) = A
+@inline LayoutPointers.preserve_buffer(A::StrideArray) = preserve_buffer(getfield(A, :data))
 
 @inline PtrArray(A::StrideArray) = getfield(A, :ptr)
 
@@ -130,7 +130,7 @@ end
 
 @inline ArrayInterface.size(A::StrideArray) = getfield(getfield(A, :ptr), :size)
 
-@inline VectorizationBase.bytestrides(A::StrideArray) = getfield(getfield(getfield(A, :ptr), :ptr), :strd)
+@inline LayoutPointers.bytestrides(A::StrideArray) = getfield(getfield(getfield(A, :ptr), :ptr), :strd)
 @inline ArrayInterface.strides(A::StrideArray) = strides(getfield(A, :ptr))
 @inline ArrayInterface.offsets(A::StrideArray) = getfield(getfield(getfield(A, :ptr), :ptr), :offsets)
 

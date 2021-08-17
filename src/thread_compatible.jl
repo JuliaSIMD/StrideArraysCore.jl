@@ -9,7 +9,7 @@ end
 @inline object_and_preserve(x) = _object_and_preserve(x)
 
 @inline object_and_preserve(x::String) = (x, x)
-@inline object_and_preserve(A::AbstractArray{T}) where {T<:VectorizationBase.NativeTypes} = array_object_and_preserve(ArrayInterface.device(A), A)
+@inline object_and_preserve(A::AbstractArray{T}) where {T<:NativeTypes} = array_object_and_preserve(ArrayInterface.device(A), A)
 @inline object_and_preserve(A::AbstractArray) = (A, A)
 @inline array_object_and_preserve(::ArrayInterface.CPUPointer, A::AbstractArray) = (PtrArray(A), preserve_buffer(A))
 @inline array_object_and_preserve(_, A::AbstractArray) = _object_and_preserve(A)

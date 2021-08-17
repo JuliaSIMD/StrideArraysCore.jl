@@ -5,17 +5,17 @@ version = "0.1.18"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
+LayoutPointers = "10f19ff3-798f-405d-979b-55457f8fc047"
 ManualMemory = "d125e4d3-2237-4719-b19c-fa641b8a4667"
 Requires = "ae029012-a4dd-5104-9daa-d747884805df"
+SIMDTypes = "94e857df-77ce-4151-89e5-788b33177be4"
 ThreadingUtilities = "8290d209-cae3-49c0-8002-c8c24d57dab5"
-VectorizationBase = "3d5dd08c-fd9d-11e8-17fa-ed2836048c2f"
 
 [compat]
 ArrayInterface = "3.1.7"
-ManualMemory = "0.1.3"
+ManualMemory = "0.1.7"
 Requires = "1"
 ThreadingUtilities = "0.4.5"
-VectorizationBase = "0.19.25, 0.20"
 julia = "1.5"
 
 [extras]
