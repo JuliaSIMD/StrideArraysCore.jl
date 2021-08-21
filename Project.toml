@@ -13,6 +13,7 @@ ThreadingUtilities = "8290d209-cae3-49c0-8002-c8c24d57dab5"
 
 [compat]
 ArrayInterface = "3.1.7"
+LayoutPointers = "0.1"
 ManualMemory = "0.1.7"
 Requires = "1"
 ThreadingUtilities = "0.4.5"
