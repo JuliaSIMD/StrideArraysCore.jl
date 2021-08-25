@@ -5,11 +5,11 @@ const AbstractStrideVector{S,D,T,C,B,R,X,O} = AbstractStrideArray{S,D,T,1,C,B,R,
 const AbstractStrideMatrix{S,D,T,C,B,R,X,O} = AbstractStrideArray{S,D,T,2,C,B,R,X,O}
 
 struct PtrArray{S,D,T,N,C,B,R,X,O} <: AbstractPtrStrideArray{S,D,T,N,C,B,R,X,O}
-    ptr::StridedPointer{T,N,C,B,R,X,O}
-    size::S
+  ptr::StridedPointer{T,N,C,B,R,X,O}
+  size::S
 end
 @inline function PtrArray(ptr::StridedPointer{T,N,C,B,R,X,O}, size::S, ::Val{D}) where {S,D,T,N,C,B,R,X,O}
-    PtrArray{S,D,T,N,C,B,R,X,O}(ptr, size)
+  PtrArray{S,D,T,N,C,B,R,X,O}(ptr, size)
 end
 
 const PtrVector{S,D,T,C,B,R,X,O} = PtrArray{S,D,T,1,C,B,R,X,O}
@@ -23,7 +23,7 @@ const PtrMatrix{S,D,T,C,B,R,X,O} = PtrArray{S,D,T,2,C,B,R,X,O}
 @inline Base.elsize(::AbstractStrideArray{<:Any,<:Any,T}) where {T} = sizeof(T)
 
 @inline ArrayInterface.size(A::PtrArray) = getfield(A, :size)
-@inline LayoutPointers.bytestrides(A::PtrArray) = getfield(getfield(A, :ptr), :strd)
+@inline LayoutPointers.bytestrides(A::PtrArray) = bytestrides(getfield(A, :ptr))
 ArrayInterface.device(::AbstractStrideArray) = ArrayInterface.CPUPointer()
 
 ArrayInterface.contiguous_axis(::Type{<:AbstractStrideArray{S,D,T,N,C}}) where {S,D,T,N,C} = StaticInt{C}()
@@ -57,14 +57,14 @@ function onetupleexpr(N::Int)
 end
 @generated onetuple(::Val{N}) where {N} = onetupleexpr(N)
 
-@inline function default_strideindex(s::Tuple{Vararg{Integer,N}}, o::Tuple{Vararg{Integer,N}}, o1::Integer) where {N}
-  StrideIndex{N,ntuple(identity,Val(N)),1}(s, o, o1)
+@inline function default_strideindex(s::Tuple{Vararg{Integer,N}}, o::Tuple{Vararg{Integer,N}}) where {N}
+  StrideIndex{N,ntuple(identity,Val(N)),1}(s, o)
 end
 @inline function default_stridedpointer(ptr::Ptr{T}, x::X) where {T, N, X <: Tuple{Vararg{Integer,N}}}
-  stridedpointer(ptr, default_strideindex(x, onetuple(Val(N)), One()))
+  stridedpointer(ptr, default_strideindex(x, onetuple(Val(N))))
 end
 @inline function default_zerobased_stridedpointer(ptr::Ptr{T}, x::X) where {T, N, X <: Tuple{Vararg{Integer,N}}}
-  stridedpointer(ptr, default_strideindex(x, LayoutPointers.zerotuple(Val(N)), Zero()))
+  stridedpointer(ptr, default_strideindex(x, LayoutPointers.zerotuple(Val(N))))
 end
 
 @inline function ptrarray0(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}, x::Tuple{Vararg{Integer,N}}, ::Val{D}) where {T,N,D}
@@ -98,34 +98,25 @@ end
   ptrarray_densestride_quote(T, N, :default_zerobased_stridedpointer)
 end
 
-@generated function ArrayInterface.strides(A::PtrArray{S,D,T,N}) where {S,D,T,N}
-  size_T = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
-  shifter = static_expr(LayoutPointers.intlog2(size_T))
-  x = Expr(:tuple)
-  for n in 1:N
-    push!(x.args, Expr(:call, :(>>>), Expr(:ref, :x, n), shifter))
-  end
-  quote
-    $(Expr(:meta,:inline))
-    x = A.ptr.strd
-    $x
-  end
+intlog2(N::I) where {I <: Integer} = (8sizeof(I) - one(I) - leading_zeros(N)) % I
+intlog2(::Type{T}) where {T} = intlog2(static_sizeof(T))
+@generated intlog2(::StaticInt{N}) where {N} = Expr(:call, Expr(:curly, :StaticInt, intlog2(N)))
+
+@inline function ArrayInterface.strides(A::PtrArray{S,D,T,N}) where {S,D,T,N}
+  map(Base.Fix2(>>>,intlog2(static_sizeof(T))), bytestrides(A))
 end
 
 @inline Base.size(A::AbstractStrideArray) = map(Int, size(A))
 @inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
-@inline function create_axis(s, ::One)
-  LayoutPointers.assume(s ≥ 0)
-  Base.OneTo(s)
-end
+@inline create_axis(s, ::One) = Base.OneTo(unsigned(s))
 @inline create_axis(s, o) = CloseOpen(o, s+o)
 
 @inline ArrayInterface.axes(A::AbstractStrideArray) = map(create_axis, size(A), offsets(A))
 @inline Base.axes(A::AbstractStrideArray) = axes(A)
 
-@inline ArrayInterface.offsets(A::PtrArray) = getfield(getfield(A, :ptr), :offsets)
+@inline ArrayInterface.offsets(A::PtrArray) = offsets(getfield(A, :ptr))
 @inline ArrayInterface.static_length(A::AbstractStrideArray) = prod(size(A))
 
 # type stable, because index known at compile time
@@ -223,7 +214,7 @@ end
     return Expr(:block, Expr(:meta,:inline), :(pointer(ptr) + (first(i)-1)*$(static_sizeof(T))))
   end
   sp = rank2sortperm(R)
-  q = Expr(:block, Expr(:meta,:inline), :(p = pointer(ptr)), :(o = LayoutPointers.offsets(ptr)), :(x = strides(ptr)))
+  q = Expr(:block, Expr(:meta,:inline), :(p = pointer(ptr)), :(o = offsets(ptr)), :(x = strides(ptr)))
   gf = GlobalRef(Core,:getfield)
   for n ∈ 1:N
     j = findfirst(==(n),sp)::Int
@@ -321,63 +312,53 @@ end
   v
 end
 
-@generated function Base.reinterpret(::Type{Tnew}, A::PtrArray{S,D,Told,N,C,B,R}) where {S,D,Told,Tnew,N,C,B,R}
-  sz_old = sizeof(Told)
-  sz_new = sizeof(Tnew)
-  if sz_old == sz_new
-    size_expr = :size_A
-    bs_expr = :bs
-  else
-    @assert 1 ≤ C ≤ N
-    size_expr = Expr(:tuple)
-    bs_expr = Expr(:tuple)
-    for n ∈ 1:N
-      sz_n = Expr(:call, GlobalRef(Core,:getfield), :size_A, n, false)
-      bs_n = Expr(:call, GlobalRef(Core,:getfield), :bs, n, false)
-      if n ≠ C
-        push!(size_expr.args, sz_n)
-        push!(bs_expr.args, bs_n)
-      elseif sz_old > sz_new
-        si = :(StaticInt{$(sz_old ÷ sz_new)}())
-        push!(size_expr.args, Expr(:call, :*, sz_n, si))
-        push!(bs_expr.args, Expr(:call, :÷, bs_n, si))
-      else
-        si = :(StaticInt{$(sz_new ÷ sz_old)}())
-        push!(size_expr.args, Expr(:call, :÷, sz_n, si))
-        push!(bs_expr.args, Expr(:call, :*, sz_n, si))
-      end
-    end
-  end
-  sp_expr = :(stridedpointer(reinterpret(Ptr{$Tnew}, pointer(sp)), StaticInt{$C}(), StaticInt{$B}(), Val{$R}(), $bs_expr, offsets(sp)))
-  ex = :(PtrArray($sp_expr, $size_expr, Val{$D}()))
-  Expr(:block, Expr(:meta,:inline), :(sp = stridedpointer(A)), :(bs = LayoutPointers.bytestrides(sp)), :(size_A = size(A)), ex)
+@inline ArrayInterface.StrideIndex(A::PtrArray) = StrideIndex(stridedpointer(A))
+
+_scale(::False, x, _, __) = x
+@inline function _scale(::True, x, num, denom)
+  cmp = Static.gt(num, denom)
+  numerator = IfElse.ifelse(cmp, num, denom)
+  denominator = IfElse.ifelse(cmp, denom, num)
+  frac = numerator ÷ denominator
+  IfElse.ifelse(cmp, x * frac, x ÷ frac)
 end
+
+@inline function Base.reinterpret(::Type{Tnew}, A::PtrArray{S,D,Told,N}) where {Tnew,Told,S,D,N}
+  sz = let szt_old = static_sizeof(Told), szt_new = static_sizeof(Tnew)
+    map(_scale, contiguous_axis_indicator(A), size(A), ntuple(_ -> szt_old, Val(N)), ntuple(_ -> szt_new, Val(N)))
+  end
+  sp = reinterpret(Tnew, stridedpointer(A))
+  PtrArray(sp, sz, Val{D}())
+end
+
 @generated function Base.reinterpret(::typeof(reshape), ::Type{Tnew}, A::PtrArray{S,D,Told,N,C,B,R}) where {S,D,Told,Tnew,N,C,B,R}
   sz_old = sizeof(Told)
   sz_new = sizeof(Tnew)
-  q = Expr(:block, Expr(:meta,:inline), :(sp = stridedpointer(A)), :(bs = LayoutPointers.bytestrides(sp)), :(size_A = size(A)), :(offs = offsets(sp)))
-  sz_old < sz_new && push!(q.args, :(@assert size_A[$C] == $(sz_new ÷ sz_old)))
+  Nnew = ifelse(sz_old == sz_new, N, ifelse(sz_old < sz_new, N - 1, N + 1))
+  Bnew = ((B ≤ 0) | (sz_old == sz_new)) ? B : ((sz_old*B) ÷ sz_new)
+  # sz_old < sz_new && push!(q.args, :(@assert size_A[$C] == $(sz_new ÷ sz_old)))
   if sz_old == sz_new
     size_expr = :size_A
-    bs_expr = :bs
+    bx_expr = :bx
     offs_expr = :offs
     Rnew = R
     Cnew = C
     Dnew = D
+    Nnew = N
   else
     @assert 1 ≤ C ≤ N
     size_expr = Expr(:tuple)
-    bs_expr = Expr(:tuple)
+    bx_expr = Expr(:tuple)
     offs_expr = Expr(:tuple)
     Rnew = Expr(:tuple)
     Dnew = Expr(:tuple)
     for n ∈ 1:N
       sz_n = Expr(:call, GlobalRef(Core,:getfield), :size_A, n, false)
-      bs_n = Expr(:call, GlobalRef(Core,:getfield), :bs, n, false)
+      bx_n = Expr(:call, GlobalRef(Core,:getfield), :bx, n, false)
       of_n = Expr(:call, GlobalRef(Core,:getfield), :offs, n, false)
       if n ≠ C
         push!(size_expr.args, sz_n)
-        push!(bs_expr.args, bs_n)
+        push!(bx_expr.args, bx_n)
         push!(offs_expr.args, of_n)
         push!(Dnew.args, D[n])
         r = R[n]
@@ -390,7 +371,7 @@ end
       elseif sz_old > sz_new
         si = :(StaticInt{$(sz_old ÷ sz_new)}())
         push!(size_expr.args, si, sz_n)
-        push!(bs_expr.args, Expr(:call, :÷, bs_n, si), bs_n)        
+        push!(bx_expr.args, Expr(:call, :÷, bx_n, si), bx_n)        
         push!(offs_expr.args, :(One()), of_n)
         push!(Dnew.args, true, D[n])
         push!(Rnew.args, 1, 1+R[n])
@@ -398,7 +379,7 @@ end
       else
         # si = :(StaticInt{$(sz_new ÷ sz_old)}())
         # push!(size_expr.args, Expr(:call, :÷, sz_n, si))
-        # push!(bs_expr.args, Expr(:call, :*, sz_n, si))
+        # push!(bx_expr.args, Expr(:call, :*, sz_n, si))
         R2ind = findfirst(==(2), R)
         Cnew = if R2ind === nothing
           0
@@ -410,10 +391,16 @@ end
       end
     end
   end
-  sp_expr = :(stridedpointer(reinterpret(Ptr{$Tnew}, pointer(sp)), StaticInt{$Cnew}(), StaticInt{$B}(), Val{$Rnew}(), $bs_expr, $offs_expr))
-  ex = :(PtrArray($sp_expr, $size_expr, Val{$Dnew}()))
-  push!(q.args, ex)
-  q
+  quote
+    $(Expr(:meta,:inline))
+    sp = stridedpointer(A)
+    bx = LayoutPointers.bytestrides(sp)
+    size_A = size(A)
+    offs = offsets(sp)
+    si = StrideIndex{$Nnew,$Rnew,$Cnew}($bx_expr, $offs_expr)
+    sp = stridedpointer(reinterpret(Ptr{$Tnew}, pointer(sp)), si, StaticInt{$Bnew}())
+    PtrArray(sp, $size_expr, Val{$Dnew}())
+  end
 end
 @inline Base.reinterpret(::Type{T}, A::AbstractStrideArray) where {T} = StrideArray(reinterpret(T, PtrArray(A)), preserve_buffer(A))
 @inline Base.reinterpret(::typeof(reshape), ::Type{T}, A::AbstractStrideArray) where {T} = StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))

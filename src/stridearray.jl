@@ -1,31 +1,9 @@
-mutable struct MemoryBuffer{L,T} <: DenseVector{T}
-    data::NTuple{L,T}
-    @inline function MemoryBuffer{L,T}(::UndefInitializer) where {L,T}
-        @assert isbitstype(T) "Memory buffers must point to bits types, but `isbitstype($T) == false`."
-        new{L,T}()
-    end
-end
-@inline Base.unsafe_convert(::Type{Ptr{T}}, d::MemoryBuffer) where {T} = Base.unsafe_convert(Ptr{T}, Base.pointer_from_objref(d))
-@inline MemoryBuffer{T}(::UndefInitializer, ::StaticInt{L}) where {L,T} = MemoryBuffer{L,T}(undef)
-Base.size(::MemoryBuffer{L}) where L = (L,)
-@inline Base.similar(::MemoryBuffer{L,T}) where {L,T} = MemoryBuffer{L,T}(undef)
-# Base.IndexStyle(::Type{<:MemoryBuffer}) = Base.IndexLinear()
-@inline function Base.getindex(m::MemoryBuffer{L,T}, i::Int) where {L,T}
-    @boundscheck checkbounds(m, i)
-    GC.@preserve m x = vload(pointer(m), sizeof(T) * (i - one(i)))
-    x
-end
-@inline function Base.setindex!(m::MemoryBuffer{L,T}, x, i::Int) where {L,T}
-    @boundscheck checkbounds(m, i)
-    GC.@preserve m vstore!(pointer(m), convert(T, x), sizeof(T) * (i - one(i)))
-end
-
 @inline undef_memory_buffer(::Type{T}, ::StaticInt{L}) where {T,L} = MemoryBuffer{L,T}(undef)
 @inline undef_memory_buffer(::Type{T}, L) where {T} = Vector{T}(undef, L)
 
 struct StrideArray{S,D,T,N,C,B,R,X,O,A} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
-    ptr::PtrArray{S,D,T,N,C,B,R,X,O}
-    data::A
+  ptr::PtrArray{S,D,T,N,C,B,R,X,O}
+  data::A
 end
 
 @inline LayoutPointers.stridedpointer(A::StrideArray) = A.ptr.ptr
@@ -71,51 +49,56 @@ end
   t
 end
 @inline ArrayInterface.size(::StaticStrideArray{S}) where {S} = to_static_tuple(Val(S))
-@inline ArrayInterface.strides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = LayoutPointers.fmap(>>>, to_static_tuple(Val(X)), LayoutPointers.intlog2(static_sizeof(T)))
+@inline function ArrayInterface.strides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X}
+  map(Base.Fix2(>>>,intlog2(static_sizeof(T))), to_static_tuple(Val(X)))
+end
 @inline LayoutPointers.bytestrides(::StaticStrideArray{S,D,T,N,C,B,R,X}) where {S,D,T,N,C,B,R,X} = to_static_tuple(Val(X))
 @inline ArrayInterface.offsets(::StaticStrideArray{S,D,T,N,C,B,R,X,O}) where {S,D,T,N,C,B,R,X,O} = to_static_tuple(Val(O))
 @inline Base.unsafe_convert(::Type{Ptr{T}}, A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
 @inline Base.pointer(A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
 @inline StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T} = StaticStrideArray{T}(undef, s)
 @inline function StaticStrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T}
+  StaticStrideArray{T}(undef, s, all_dense(Val(N)))
+end
+@inline function StaticStrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}, ::Val{D}) where {N,T,D}
   x, L = calc_strides_len(T,s)
   R = ntuple(Int, Val(N))
   O = ntuple(_ -> One(), Val(N))
-  Tshifter = LayoutPointers.intlog2(static_sizeof(T))
-  StaticStrideArray{typeof(s),LayoutPointers.unwrap(all_dense(Val(N))),T,N,1,0,R,typeof(x),typeof(O),Int(L >>> Tshifter)}(undef)
+  Tshifter = intlog2(static_sizeof(T))
+  StaticStrideArray{typeof(s),D,T,N,1,0,R,typeof(x),typeof(O),Int(L >>> Tshifter)}(undef)
 end
 
 function dense_quote(N::Int, b::Bool)
-    d = Expr(:tuple)
-    for n in 1:N
-        push!(d.args, b)
-    end
-    Expr(:call, Expr(:curly, :Val, d))
+  d = Expr(:tuple)
+  for n in 1:N
+    push!(d.args, b)
+  end
+  Expr(:call, Expr(:curly, :Val, d))
 end
 @generated all_dense(::Val{N}) where {N} = dense_quote(N, true)
 
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{StaticInt,N}}) where {T, N}
-    L = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
-    t = Expr(:tuple)
-    for n ∈ 1:N
-        push!(t.args, static_expr(L))
-        L *= s.parameters[n].parameters[1]
-    end
-    Expr(:tuple, t, static_expr(L))
+  L = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
+  t = Expr(:tuple)
+  for n ∈ 1:N
+    push!(t.args, static_expr(L))
+    L *= s.parameters[n].parameters[1]
+  end
+  Expr(:tuple, t, static_expr(L))
 end
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Any,N}}) where {T, N}
-    last_sx = :s_0
-    st = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
-    q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(st)))
-    t = Expr(:tuple)
-    for n ∈ 1:N
-        push!(t.args, last_sx)
-        new_sx = Symbol(:s_,n)
-        push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:ref, :s, n))))
-        last_sx = new_sx
-    end
-    push!(q.args, Expr(:tuple, t, last_sx))
-    q
+  last_sx = :s_0
+  st = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
+  q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(st)))
+  t = Expr(:tuple)
+  for n ∈ 1:N
+    push!(t.args, last_sx)
+    new_sx = Symbol(:s_,n)
+    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:ref, :s, n))))
+    last_sx = new_sx
+  end
+  push!(q.args, Expr(:tuple, t, last_sx))
+  q
 end
 
 @inline LayoutPointers.preserve_buffer(A::MemoryBuffer) = A
@@ -130,9 +113,9 @@ end
 
 @inline ArrayInterface.size(A::StrideArray) = getfield(getfield(A, :ptr), :size)
 
-@inline LayoutPointers.bytestrides(A::StrideArray) = getfield(getfield(getfield(A, :ptr), :ptr), :strd)
+@inline LayoutPointers.bytestrides(A::StrideArray) = bytestrides(getfield(getfield(A, :ptr), :ptr))
 @inline ArrayInterface.strides(A::StrideArray) = strides(getfield(A, :ptr))
-@inline ArrayInterface.offsets(A::StrideArray) = getfield(getfield(getfield(A, :ptr), :ptr), :offsets)
+@inline ArrayInterface.offsets(A::StrideArray) = offsets(getfield(getfield(A, :ptr), :ptr))
 
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{One}) = CloseOpen(Zero(), last(r))
 @inline zeroindex(r::Base.OneTo) = CloseOpen(Zero(), last(r))
@@ -146,66 +129,66 @@ end
 
 @generated rank_to_sortperm_val(::Val{R}) where {R} = :(Val{$(rank_to_sortperm(R))}())
 @inline function similar_layout(A::AbstractStrideArray{S,D,T,N,C,B,R}) where {S,D,T,N,C,B,R}
-    permutedims(similar(permutedims(A, rank_to_sortperm_val(Val{R}()))), Val{R}())
+  permutedims(similar(permutedims(A, rank_to_sortperm_val(Val{R}()))), Val{R}())
 end
 @inline function similar_layout(A::AbstractArray)
-    b = preserve_buffer(A)
-    GC.@preserve b begin
-        similar_layout(PtrArray(A))
-    end
+  b = preserve_buffer(A)
+  GC.@preserve b begin
+    similar_layout(PtrArray(A))
+  end
 end
 @inline function Base.similar(A::AbstractStrideArray{S,D,T}) where {S,D,T}
-    StrideArray{T}(undef, size(A))
+  StrideArray{T}(undef, size(A))
 end
 @inline function Base.similar(A::AbstractStrideArray, ::Type{T}) where {T}
-    StrideArray{T}(undef, size(A))
+  StrideArray{T}(undef, size(A))
 end
 
 
 @inline function Base.view(A::AbstractStrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
-    StrideArray(view(PtrArray(A), i...), preserve_buffer(A))
+  StrideArray(view(PtrArray(A), i...), preserve_buffer(A))
 end
 @inline function zview(A::AbstractStrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
-    StrideArray(zview(PtrArray(A), i...), preserve_buffer(A))
+  StrideArray(zview(PtrArray(A), i...), preserve_buffer(A))
 end
 @inline function Base.permutedims(A::AbstractStrideArray, ::Val{P}) where {P}
-    StrideArray(permutedims(PtrArray(A), Val{P}()), preserve_buffer(A))
+  StrideArray(permutedims(PtrArray(A), Val{P}()), preserve_buffer(A))
 end
 @inline Base.adjoint(a::AbstractStrideVector) = StrideArray(adjoint(PtrArray(a)), preserve_buffer(a))
 
 
 function gc_preserve_call(ex, skip=0)
-    q = Expr(:block)
-    call = Expr(:call, esc(ex.args[1]))
-    gcp = Expr(:gc_preserve, call)
-    for i ∈ 2:length(ex.args)
-        arg = ex.args[i]
-        if i+1 ≤ skip
-            push!(call.args, arg)
-            continue
-        end
-        A = gensym(:A); buffer = gensym(:buffer);
-        if arg isa Expr && arg.head === :kw
-            push!(call.args, Expr(:kw, arg.args[1], Expr(:call, :maybe_ptr_array, A)))
-            arg = arg.args[2]
-        else
-            push!(call.args, Expr(:call, :maybe_ptr_array, A))
-        end
-        push!(q.args, :($A = $(esc(arg))))
-        push!(q.args, Expr(:(=), buffer, Expr(:call, :preserve_buffer, A)))
-        push!(gcp.args, buffer)
+  q = Expr(:block)
+  call = Expr(:call, esc(ex.args[1]))
+  gcp = Expr(:gc_preserve, call)
+  for i ∈ 2:length(ex.args)
+    arg = ex.args[i]
+    if i+1 ≤ skip
+      push!(call.args, arg)
+      continue
     end
-    push!(q.args, gcp)
-    q
+    A = gensym(:A); buffer = gensym(:buffer);
+    if arg isa Expr && arg.head === :kw
+      push!(call.args, Expr(:kw, arg.args[1], Expr(:call, :maybe_ptr_array, A)))
+      arg = arg.args[2]
+    else
+      push!(call.args, Expr(:call, :maybe_ptr_array, A))
+    end
+    push!(q.args, :($A = $(esc(arg))))
+    push!(q.args, Expr(:(=), buffer, Expr(:call, :preserve_buffer, A)))
+    push!(gcp.args, buffer)
+  end
+  push!(q.args, gcp)
+  q
 end
 """
-  @gc_preserve foo(A, B, C)
+    @gc_preserve foo(A, B, C)
 
-Apply to a single, non-nested, function call. It will `GC.@preserve` all the arguments, and substitute suitable arrays with `PtrArray`s.
-This has the benefit of potentially allowing statically sized mutable arrays to be both stack allocated, and passed through a non-inlined function boundary.
-"""
+  Apply to a single, non-nested, function call. It will `GC.@preserve` all the arguments, and substitute suitable arrays with `PtrArray`s.
+  This has the benefit of potentially allowing statically sized mutable arrays to be both stack allocated, and passed through a non-inlined function boundary.
+  """
 macro gc_preserve(ex)
-    @assert ex.head === :call
-    gc_preserve_call(ex)
+  @assert ex.head === :call
+  gc_preserve_call(ex)
 end
 

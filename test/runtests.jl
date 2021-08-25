@@ -187,4 +187,8 @@ end
       @test C[3,4] === StrideArraysCore.zeroindex(C)[2,3] === -10.0
     end
   end
+  @testset "reinterpret" begin
+    
+  end
 end
+

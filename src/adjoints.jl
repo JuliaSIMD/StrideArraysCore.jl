@@ -29,11 +29,11 @@ end
   Dnew, Cnew, Bnew, Rnew, s, x, o = permute_dims_expr(P, D, C, B, R)
   quote
     $(Expr(:meta,:inline))
-    s = A.size
-    ptr = A.ptr
-    x = ptr.strd
-    o = ptr.offsets
-    si = StrideIndex{$N,$Rnew,$Cnew}($x, $o, offset1(A))
+    s = size(A)
+    ptr = stridedpointer(A)
+    x = strides(ptr)
+    o = offsets(ptr)
+    si = StrideIndex{$N,$Rnew,$Cnew}($x, $o)
     sp = stridedpointer(ptr.p, si, StaticInt{$B}())
     PtrArray(sp, $s, Val{$Dnew}())
   end
@@ -54,11 +54,11 @@ end
   Cnew = C == 1 ? 2 : C
   quote
     $(Expr(:meta,:inline))
-    s = a.size
-    ptr = a.ptr
-    x = ptr.strd
-    o = ptr.offsets
-    si = StrideIndex{2,$Rnew,$Cnew}($x, $o, offset1(a))
+    s = size(a)
+    ptr = stridedpointer(a)
+    x = strides(ptr)
+    o = offsets(ptr)
+    si = StrideIndex{2,$Rnew,$Cnew}($x, $o)
     sp = stridedpointer(ptr.p, si, StaticInt{$B}())
     PtrArray(sp, $s, Val{$Dnew}())
   end
@@ -66,5 +66,7 @@ end
 
 @inline Base.transpose(a::AbstractStrideVector) = adjoint(a)
 
-
+@inline row_major(a::AbstractStrideVector) = a
+@inline row_major(A::AbstractStrideMatrix) = A
+@inline row_major(A::AbstractStrideArray{S,D,T,N}) where {S,D,T,N} = permutedims(A, Val(ntuple(Base.Fix1(-,N+1),Val(N))))
 
