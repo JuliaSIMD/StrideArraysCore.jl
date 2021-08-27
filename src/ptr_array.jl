@@ -111,6 +111,7 @@ end
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
 @inline create_axis(s, ::One) = Base.OneTo(unsigned(s))
+@inline create_axis(::StaticInt{N}, ::One) where {N} = One():StaticInt{N}()
 @inline create_axis(s, o) = CloseOpen(o, s+o)
 
 @inline ArrayInterface.axes(A::AbstractStrideArray) = map(create_axis, size(A), offsets(A))
