@@ -313,7 +313,7 @@ end
   v
 end
 
-@inline ArrayInterface.StrideIndex(A::PtrArray) = StrideIndex(stridedpointer(A))
+@inline LayoutPointers.bytestrideindex(A::AbstractStrideArray{T}) where {T} = StrideIndex(stridedpointer(A))
 
 _scale(::False, x, _, __) = x
 @inline function _scale(::True, x, num, denom)

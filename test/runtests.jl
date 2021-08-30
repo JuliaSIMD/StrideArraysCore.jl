@@ -187,8 +187,26 @@ end
       @test C[3,4] === StrideArraysCore.zeroindex(C)[2,3] === -10.0
     end
   end
-  @testset "reinterpret" begin
-    
+  @testset "views" begin
+    A = StrideArray{Float64}(undef, (100,100)) .= rand.()
+    vA = view(A, 3:40, 2:50)
+    vAslice = view(A, :, 2:50)
+    vaslice = view(A, 2:50, 4)
+    x = StrideArray{Float64}(undef, (100,)) .= rand.()
+    vxslice = view(A, 2:50)
+    for (i,n) in enumerate(2:50)
+      @test vaslice[i] == A[n,4]
+      @test vxslice[i] == x[n]
+      for (j,m) in enumerate(3:40)
+        @test A[m, n] == vA[j,i]
+      end
+      for j in 1:50
+        @test A[j,n] == vAslice[j,i]
+      end
+    end
   end
+  # @testset "reinterpret" begin
+    
+  # end
 end
 
