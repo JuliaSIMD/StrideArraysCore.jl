@@ -193,7 +193,7 @@ end
     vAslice = view(A, :, 2:50)
     vaslice = view(A, 2:50, 4)
     x = StrideArray{Float64}(undef, (100,)) .= rand.()
-    vxslice = view(A, 2:50)
+    vxslice = view(x, 2:50)
     for (i,n) in enumerate(2:50)
       @test vaslice[i] == A[n,4]
       @test vxslice[i] == x[n]

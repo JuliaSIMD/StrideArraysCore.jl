@@ -6,7 +6,7 @@ struct StrideArray{S,D,T,N,C,B,R,X,O,A} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O
   data::A
 end
 
-@inline LayoutPointers.stridedpointer(A::StrideArray) = A.ptr.ptr
+@inline LayoutPointers.stridedpointer(A::StrideArray) = getfield(getfield(A,:ptr),:ptr)
 
 const StrideVector{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,1,C,B,R,X,O,A}
 const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
@@ -60,6 +60,10 @@ end
 @inline function StaticStrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T}
   StaticStrideArray{T}(undef, s, all_dense(Val(N)))
 end
+@inline function LayoutPointers.bytestrideindex(A::StaticStrideArray{S,D,T,N,C,B,R}) where {S,D,T,N,C,B,R}
+  StrideIndex{N,R,C}(LayoutPointers.bytestrides(A), offsets(A))
+end
+
 @inline function StaticStrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}, ::Val{D}) where {N,T,D}
   x, L = calc_strides_len(T,s)
   R = ntuple(Int, Val(N))
