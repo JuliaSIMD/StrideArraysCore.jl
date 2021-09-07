@@ -121,12 +121,12 @@ end
 @inline ArrayInterface.static_length(A::AbstractStrideArray) = prod(size(A))
 
 # type stable, because index known at compile time
-@inline type_stable_select(t::NTuple, ::StaticInt{N}) where {N} = t[N]
-@inline type_stable_select(t::Tuple, ::StaticInt{N}) where {N} = t[N]
+@inline type_stable_select(t::NTuple, ::StaticInt{N}) where {N} = getfield(t, N, false)
+@inline type_stable_select(t::Tuple, ::StaticInt{N}) where {N} = getfield(t, N, false)
 # type stable, because tuple is homogenous
-@inline type_stable_select(t::NTuple, i::Integer) = t[i]
+@inline type_stable_select(t::NTuple, i::Integer) = getfield(t, i, false)
 # make the tuple homogenous before indexing
-@inline type_stable_select(t::Tuple, i::Integer) = map(Int, t)[i]
+@inline type_stable_select(t::Tuple, i::Integer) = getfield(map(Int, t), i, false)
 
 @inline function ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N}
   if i ≤ N
