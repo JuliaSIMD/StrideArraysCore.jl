@@ -118,7 +118,7 @@ end
 @inline Base.axes(A::AbstractStrideArray) = axes(A)
 
 @inline ArrayInterface.offsets(A::PtrArray) = offsets(getfield(A, :ptr))
-@inline ArrayInterface.static_length(A::AbstractStrideArray) = prod(size(A))
+@inline ArrayInterface.static_length(A::AbstractStrideArray) = ArrayInterface.reduce_tup(*, size(A))
 
 # type stable, because index known at compile time
 @inline type_stable_select(t::NTuple, ::StaticInt{N}) where {N} = getfield(t, N, false)

@@ -37,7 +37,7 @@ end
 
 mutable struct StaticStrideArray{S,D,T,N,C,B,R,X,O,L} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
   data::NTuple{L,T}
-  @inline StaticStrideArray{S,D,T,N,C,B,R,X,O}(::UndefInitializer) where {S,D,T,N,C,B,R,X,O} = new{S,D,T,N,C,B,R,X,O,Int(prod(to_static_tuple(Val(S))))}()
+  @inline StaticStrideArray{S,D,T,N,C,B,R,X,O}(::UndefInitializer) where {S,D,T,N,C,B,R,X,O} = new{S,D,T,N,C,B,R,X,O,Int(ArrayInterface.reduce_tup(*, to_static_tuple(Val(S))))}()
   @inline StaticStrideArray{S,D,T,N,C,B,R,X,O,L}(::UndefInitializer) where {S,D,T,N,C,B,R,X,O,L} = new{S,D,T,N,C,B,R,X,O,L}()
 end
 
