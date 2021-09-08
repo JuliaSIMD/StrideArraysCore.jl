@@ -13,7 +13,7 @@ using CloseOpenIntervals
 
 using ManualMemory: preserve_buffer, offsetsize, MemoryBuffer
 
-using SIMDTypes: NativeTypes
+using SIMDTypes: NativeTypes, Bit
 
 export PtrArray, StrideArray, StaticInt
 

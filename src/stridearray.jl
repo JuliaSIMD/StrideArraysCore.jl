@@ -1,5 +1,8 @@
 @inline undef_memory_buffer(::Type{T}, ::StaticInt{L}) where {T,L} = MemoryBuffer{L,T}(undef)
 @inline undef_memory_buffer(::Type{T}, L) where {T} = Vector{T}(undef, L)
+@inline undef_memory_buffer(::Type{Bit}, ::StaticInt{L}) where {L} = MemoryBuffer{(L+7)>>>3,UInt8}(undef)
+@inline undef_memory_buffer(::Type{Bit}, L) = Vector{UInt8}(undef, (L+7)>>>3)
+# @inline undef_memory_buffer(::Type{Bit}, L) = BitVector(undef, L)
 
 struct StrideArray{S,D,T,N,C,B,R,X,O,A} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
   ptr::PtrArray{S,D,T,N,C,B,R,X,O}
@@ -14,16 +17,15 @@ const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
 @inline StrideArray(A::AbstractArray) = StrideArray(PtrArray(A), A)
 
 @inline function StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{Integer,N}}) where {N,T}
-    x, L = calc_strides_len(T,s)
-    b = undef_memory_buffer(T, L ÷ static_sizeof(T))
-    # For now, just trust Julia's alignment heuristics are doing the right thing
-    # to save us from having to over-allocate
-    # ptr = LayoutPointers.align(pointer(b))
-    ptr = pointer(b)
-    StrideArray(ptr, s, x, b, all_dense(Val{N}()))
+  x, L = calc_strides_len(T,s)
+  b = undef_memory_buffe(T, L ÷ static_sizeof(T))
+  # For now, just trust Julia's alignment heuristics are doing the right thing
+  # to save us from having to over-allocate
+  # ptr = LayoutPointers.align(pointer(b))
+  StrideArray(pointer(b), s, x, b, all_dense(Val{N}()))
 end
 @inline function StrideArray(ptr::Ptr{T}, s::S, x::X, b, ::Val{D}) where {S,X,T,D}
-    StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
+  StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
 end
 @inline StrideArray(::UndefInitializer, s::Vararg{Integer,N}) where {N} = StrideArray{Float64}(undef, s)
 @inline StrideArray(::UndefInitializer, s::Tuple{Vararg{Integer,N}}) where {N} = StrideArray{Float64}(undef, s)
@@ -81,6 +83,21 @@ function dense_quote(N::Int, b::Bool)
 end
 @generated all_dense(::Val{N}) where {N} = dense_quote(N, true)
 
+@generated function calc_strides_len(::Type{Bit}, s::Tuple{Vararg{Integer,N}}) where {N}
+  last_sx = :s_0
+  q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(1)))
+  t = Expr(:tuple)
+  for n ∈ 1:N
+    push!(t.args, last_sx)
+    new_sx = Symbol(:s_, n)
+    sz_expr = Expr(:call, getfield, :s, n, false)
+    (n == 1) && (sz_expr = :(($sz_expr + StaticInt{7}()) & StaticInt{-8}()))
+    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, sz_expr)))
+    last_sx = new_sx
+  end
+  push!(q.args, Expr(:tuple, t, last_sx))
+  q  
+end
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{StaticInt,N}}) where {T, N}
   L = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
   t = Expr(:tuple)
@@ -90,15 +107,15 @@ end
   end
   Expr(:tuple, t, static_expr(L))
 end
-@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Any,N}}) where {T, N}
+@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Integer,N}}) where {T, N}
   last_sx = :s_0
   st = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
   q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(st)))
   t = Expr(:tuple)
   for n ∈ 1:N
     push!(t.args, last_sx)
-    new_sx = Symbol(:s_,n)
-    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:ref, :s, n))))
+    new_sx = Symbol(:s_, n)
+    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:call, getfield, :s, n, false))))
     last_sx = new_sx
   end
   push!(q.args, Expr(:tuple, t, last_sx))
