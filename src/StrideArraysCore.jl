@@ -6,8 +6,8 @@ using ArrayInterface: StaticInt, Zero, One, StaticBool, True, False,
   static_length, static_first, static_last, axes,
   dense_dims, stride_rank, StrideIndex, contiguous_axis_indicator
 using LayoutPointers:
-  AbstractStridedPointer, bytestrides,
-  StridedPointer, zstridedpointer,
+  AbstractStridedPointer, StridedPointer, StridedBitPointer,
+  bytestrides, zstridedpointer,
   val_dense_dims, val_stride_rank
 using CloseOpenIntervals
 

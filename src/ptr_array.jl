@@ -1,4 +1,3 @@
-
 abstract type AbstractStrideArray{S,D,T,N,C,B,R,X,O} <: DenseArray{T,N} end
 abstract type AbstractPtrStrideArray{S,D,T,N,C,B,R,X,O} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O} end
 const AbstractStrideVector{S,D,T,C,B,R,X,O} = AbstractStrideArray{S,D,T,1,C,B,R,X,O}
@@ -11,6 +10,13 @@ end
 @inline function PtrArray(ptr::StridedPointer{T,N,C,B,R,X,O}, size::S, ::Val{D}) where {S,D,T,N,C,B,R,X,O}
   PtrArray{S,D,T,N,C,B,R,X,O}(ptr, size)
 end
+struct BitPtrArray{S,D,N,C,B,R,X,O} <: AbstractPtrStrideArray{S,D,Bit,N,C,B,R,X,O}
+  ptr::StridedBitPointer{N,C,B,R,X,O}
+  size::S
+end
+@inline function PtrArray(ptr::StridedBitPointer{N,C,B,R,X,O}, size::S, ::Val{D}) where {S,D,N,C,B,R,X,O}
+  BitPtrArray{S,D,N,C,B,R,X,O}(ptr, size)
+end
 
 const PtrVector{S,D,T,C,B,R,X,O} = PtrArray{S,D,T,1,C,B,R,X,O}
 const PtrMatrix{S,D,T,C,B,R,X,O} = PtrArray{S,D,T,2,C,B,R,X,O}
@@ -18,6 +24,7 @@ const PtrMatrix{S,D,T,C,B,R,X,O} = PtrArray{S,D,T,2,C,B,R,X,O}
 @inline PtrArray(A::AbstractArray) = PtrArray(stridedpointer(A), size(A), val_dense_dims(A))
 
 @inline LayoutPointers.stridedpointer(A::PtrArray) = getfield(A, :ptr)
+@inline LayoutPointers.stridedpointer(A::BitPtrArray) = getfield(A, :ptr)
 @inline Base.pointer(A::AbstractStrideArray) = pointer(stridedpointer(A))
 @inline Base.unsafe_convert(::Type{Ptr{T}}, A::AbstractStrideArray) where {T} = Base.unsafe_convert(Ptr{T}, pointer(A))
 @inline Base.elsize(::AbstractStrideArray{<:Any,<:Any,T}) where {T} = sizeof(T)
@@ -46,7 +53,7 @@ end
   t
 end
 
-@inline bytestride(A, n) = LayoutPointers.bytestrides(A)[n]
+# @inline bytestride(A, n) = LayoutPointers.bytestrides(A)[n]
 
 function onetupleexpr(N::Int)
   t = Expr(:tuple);
@@ -73,6 +80,7 @@ end
 @inline function PtrArray(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}, x::Tuple{Vararg{Integer,N}}, ::Val{D}) where {T,N,D}
   PtrArray(default_stridedpointer(ptr, x), s, Val{D}())
 end
+
 
 function ptrarray_densestride_quote(::Type{T}, N, stridedpointer_offsets) where {T}
   last_sx = :s_0
@@ -158,7 +166,7 @@ end
     :(IndexLinear())
   else
     :(IndexCartesian())
-  end          
+  end
 end
 
 @inline LayoutPointers.preserve_buffer(A::PtrArray) = nothing
@@ -206,23 +214,28 @@ end
 #   q
 # end
 @generated function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
-  N == 0 && return Expr(:block, Expr(:meta,:inline), :(pointer(ptr)))
+  ptr_expr = :(pointer(ptr))
+  T === Bit && (ptr_expr = :(reinterpret(Ptr{UInt8}, $ptr_expr)))
+  N == 0 && return Expr(:block, Expr(:meta,:inline), ptr_expr)
   if N ≠ NI
     if (N > NI) & (NI ≠ 1)
       throw(ArgumentError("If the dimension of the array exceeds the dimension of the index, then the index should be linear/one dimensional."))
     end
     # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
-    return Expr(:block, Expr(:meta,:inline), :(pointer(ptr) + (first(i)-1)*$(static_sizeof(T))))
+    return Expr(:block, Expr(:meta,:inline), :($ptr_expr + (first(i)-1)*$(static_sizeof(T))))
   end
   sp = rank2sortperm(R)
-  q = Expr(:block, Expr(:meta,:inline), :(p = pointer(ptr)), :(o = offsets(ptr)), :(x = strides(ptr)))
-  gf = GlobalRef(Core,:getfield)
+  q = Expr(:block, Expr(:meta,:inline), :(p = $ptr_expr), :(o = offsets(ptr)), :(x = strides(ptr)))
   for n ∈ 1:N
     j = findfirst(==(n),sp)::Int
-    index = Expr(:call, gf, :i, j, false)
-    offst = Expr(:call, gf, :o, j, false)
-    strid = Expr(:call, gf, :x, j, false)
-    push!(q.args, :(p += ($index - $offst)*$strid))
+    index = Expr(:call, getfield, :i, j, false)
+    offst = Expr(:call, getfield, :o, j, false)
+    strid = Expr(:call, getfield, :x, j, false)
+    if T ≢ Bit
+      push!(q.args, :(p += ($index - $offst)*$strid))
+    else
+      push!(q.args, :(p += (($index - $offst)>>>3)*$strid))
+    end
   end
   q
 end
@@ -231,87 +244,112 @@ end
 #   __offset_ptr(LayoutPointers.center(ptr), i)
 # end
 
+
+@inline function Base.getindex(A::BitPtrArray{S,D,N,C}, i::Vararg{Integer,N}) where {S,D,N,C}
+  fi = getfield(i, C) - getfield(offsets(A), C)
+  u = pload(_offset_ptr(stridedpointer(A), i))
+  (u >>> (fi & 7)) % Bool
+end
+@inline function Base.getindex(A::BitPtrArray{S,D,N,C}, i::Integer) where {S,D,N,C}
+  j = i - oneunit(i)
+  u = pload(reinterpret(Ptr{UInt8}, pointer(A)) + (j >>> 3))
+  (u >>> (j & 7)) % Bool
+end
+# Base.@propagate_inbounds function Base.getindex(A::AbstractStrideArray, i::Vararg{Any,K}) where {K}
+# end
+Base.@propagate_inbounds function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer,K}) where {K}
+  b = preserve_buffer(A)
+  GC.@preserve b begin
+    PtrArray(A)[i...]
+  end
+end
+Base.@propagate_inbounds function Base.setindex!(A::AbstractStrideArray, v, i::Vararg{Integer,K}) where {K}
+  b = preserve_buffer(A)
+  GC.@preserve b begin
+    PtrArray(A)[i...] = v
+  end
+end
 # Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, i::Int, j::Int) = A[i]
 @inline function Base.getindex(A::PtrArray, i::Vararg{Integer})
   @boundscheck checkbounds(A, i...)
   pload(_offset_ptr(stridedpointer(A), i))
 end
-@inline function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer,K}) where {K}
-  b = preserve_buffer(A)
-  P = PtrArray(A)
-  GC.@preserve b begin
-    @boundscheck checkbounds(P, i...)
-    pload(_offset_ptr(stridedpointer(A), i))
-  end
-end
+# @inline function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer,K}) where {K}
+#   b = preserve_buffer(A)
+#   P = PtrArray(A)
+#   GC.@preserve b begin
+#     @boundscheck checkbounds(P, i...)
+#     pload(_offset_ptr(stridedpointer(P), i))
+#   end
+# end
 @inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer,K}) where {K}
   @boundscheck checkbounds(A, i...)
   pstore!(_offset_ptr(stridedpointer(A), i), v)
   v
 end
-@inline function Base.setindex!(A::AbstractStrideArray, v, i::Vararg{Integer,K}) where {K}
-  b = preserve_buffer(A)
-  P = PtrArray(A)
-  GC.@preserve b begin
-    @boundscheck checkbounds(P, i...)
-    pstore!(_offset_ptr(stridedpointer(A), i), v)
-  end
-  v
-end
+# @inline function Base.setindex!(A::AbstractStrideArray, v, i::Vararg{Integer,K}) where {K}
+#   b = preserve_buffer(A)
+#   P = PtrArray(A)
+#   GC.@preserve b begin
+#     @boundscheck checkbounds(P, i...)
+#     pstore!(_offset_ptr(stridedpointer(A), i), v)
+#   end
+#   v
+# end
 @inline function Base.getindex(A::PtrArray{S,D,T}, i::Integer) where {S,D,T}
   @boundscheck checkbounds(A, i)
   pload(pointer(A) + (i-oneunit(i))*static_sizeof(T))
 end
-@inline function Base.getindex(A::AbstractStrideArray{S,D,T}, i::Integer) where {S,D,T}
-  b = preserve_buffer(A)
-  P = PtrArray(A)
-  GC.@preserve b begin
-    @boundscheck checkbounds(P, i)
-    pload(pointer(A) + (i-oneunit(i))*static_sizeof(T))
-  end
-end
+# @inline function Base.getindex(A::AbstractStrideArray{S,D,T}, i::Integer) where {S,D,T}
+#   b = preserve_buffer(A)
+#   P = PtrArray(A)
+#   GC.@preserve b begin
+#     @boundscheck checkbounds(P, i)
+#     pload(pointer(A) + (i-oneunit(i))*static_sizeof(T))
+#   end
+# end
 @inline function Base.setindex!(A::PtrArray{S,D,T}, v, i::Integer) where {S,D,T}
   @boundscheck checkbounds(A, i)
   pstore!(pointer(A) + (i-oneunit(i))*static_sizeof(T), v)
   v
 end
-@inline function Base.setindex!(A::AbstractStrideArray{S,D,T}, v, i::Integer) where {S,D,T}
-  b = preserve_buffer(A)
-  P = PtrArray(A)
-  GC.@preserve b begin
-    @boundscheck checkbounds(P, i)
-    pstore!(pointer(A) + (i-oneunit(i))*static_sizeof(T), v)
-  end
-  v
-end
+# @inline function Base.setindex!(A::AbstractStrideArray{S,D,T}, v, i::Integer) where {S,D,T}
+#   b = preserve_buffer(A)
+#   P = PtrArray(A)
+#   GC.@preserve b begin
+#     @boundscheck checkbounds(P, i)
+#     pstore!(pointer(A) + (i-oneunit(i))*static_sizeof(T), v)
+#   end
+#   v
+# end
 
 
 @inline function Base.getindex(A::PtrVector{S,D,T}, i::Integer) where {S,D,T}
   @boundscheck checkbounds(A, i)
   pload(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)))
 end
-@inline function Base.getindex(A::AbstractStrideVector{S,D,T}, i::Integer) where {S,D,T}
-  b = preserve_buffer(A)
-  P = PtrArray(A)
-  GC.@preserve b begin
-    @boundscheck checkbounds(P, i)
-    pload(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)))
-  end
-end
+# @inline function Base.getindex(A::AbstractStrideVector{S,D,T}, i::Integer) where {S,D,T}
+#   b = preserve_buffer(A)
+#   P = PtrArray(A)
+#   GC.@preserve b begin
+#     @boundscheck checkbounds(P, i)
+#     pload(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)))
+#   end
+# end
 @inline function Base.setindex!(A::PtrVector{S,D,T}, v, i::Integer) where {S,D,T}
   @boundscheck checkbounds(A, i)
   pstore!(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)), v)
   v
 end
-@inline function Base.setindex!(A::AbstractStrideVector{S,D,T}, v, i::Integer) where {S,D,T}
-  b = preserve_buffer(A)
-  P = PtrArray(A)
-  GC.@preserve b begin
-    @boundscheck checkbounds(P, i)
-    pstore!(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)), v)
-  end
-  v
-end
+# @inline function Base.setindex!(A::AbstractStrideVector{S,D,T}, v, i::Integer) where {S,D,T}
+#   b = preserve_buffer(A)
+#   P = PtrArray(A)
+#   GC.@preserve b begin
+#     @boundscheck checkbounds(P, i)
+#     pstore!(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)), v)
+#   end
+#   v
+# end
 
 @inline LayoutPointers.bytestrideindex(A::AbstractStrideArray{T}) where {T} = StrideIndex(stridedpointer(A))
 
@@ -372,7 +410,7 @@ end
       elseif sz_old > sz_new
         si = :(StaticInt{$(sz_old ÷ sz_new)}())
         push!(size_expr.args, si, sz_n)
-        push!(bx_expr.args, Expr(:call, :÷, bx_n, si), bx_n)        
+        push!(bx_expr.args, Expr(:call, :÷, bx_n, si), bx_n)
         push!(offs_expr.args, :(One()), of_n)
         push!(Dnew.args, true, D[n])
         push!(Rnew.args, 1, 1+R[n])
@@ -405,5 +443,3 @@ end
 end
 @inline Base.reinterpret(::Type{T}, A::AbstractStrideArray) where {T} = StrideArray(reinterpret(T, PtrArray(A)), preserve_buffer(A))
 @inline Base.reinterpret(::typeof(reshape), ::Type{T}, A::AbstractStrideArray) where {T} = StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
-
-

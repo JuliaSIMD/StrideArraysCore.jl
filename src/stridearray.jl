@@ -4,12 +4,17 @@
 @inline undef_memory_buffer(::Type{Bit}, L) = Vector{UInt8}(undef, (L+7)>>>3)
 # @inline undef_memory_buffer(::Type{Bit}, L) = BitVector(undef, L)
 
-struct StrideArray{S,D,T,N,C,B,R,X,O,A} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
+struct StrideArray{S,D,T,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
   ptr::PtrArray{S,D,T,N,C,B,R,X,O}
   data::A
 end
-
+struct StrideBitArray{S,D,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} <: AbstractStrideArray{S,D,Bit,N,C,B,R,X,O}
+  ptr::BitPtrArray{S,D,N,C,B,R,X,O}
+  data::A
+end
+StrideArray(ptr::BitPtrArray{S,D,N,C,B,R,X,O}, data::A) where {S,D,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} = StrideBitArray{S,D,N,C,B,R,X,O,A}(ptr, data)
 @inline LayoutPointers.stridedpointer(A::StrideArray) = getfield(getfield(A,:ptr),:ptr)
+@inline LayoutPointers.stridedpointer(A::StrideBitArray) = getfield(getfield(A,:ptr),:ptr)
 
 const StrideVector{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,1,C,B,R,X,O,A}
 const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
@@ -18,11 +23,11 @@ const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
 
 @inline function StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{Integer,N}}) where {N,T}
   x, L = calc_strides_len(T,s)
-  b = undef_memory_buffe(T, L ÷ static_sizeof(T))
+  b = undef_memory_buffer(T, L ÷ static_sizeof(T))
   # For now, just trust Julia's alignment heuristics are doing the right thing
   # to save us from having to over-allocate
   # ptr = LayoutPointers.align(pointer(b))
-  StrideArray(pointer(b), s, x, b, all_dense(Val{N}()))
+  StrideArray(reinterpret(Ptr{T}, pointer(b)), s, x, b, all_dense(Val{N}()))
 end
 @inline function StrideArray(ptr::Ptr{T}, s::S, x::X, b, ::Val{D}) where {S,X,T,D}
   StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
@@ -33,7 +38,7 @@ end
 @inline function StrideArray(A::PtrArray{S,D,T,N}, s::Tuple{Vararg{Integer,N}}) where {S,D,T,N}
   PtrArray(stridedpointer(A), s, val_dense_dims(A))
 end
-@inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Integer,N}}) where {T,N}
+@inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Any,N}}) where {T,N}
   StrideArray(PtrArray(stridedpointer(A), s, val_dense_dims(A)), preserve_buffer(A))
 end
 
@@ -83,27 +88,17 @@ function dense_quote(N::Int, b::Bool)
 end
 @generated all_dense(::Val{N}) where {N} = dense_quote(N, true)
 
-@generated function calc_strides_len(::Type{Bit}, s::Tuple{Vararg{Integer,N}}) where {N}
-  last_sx = :s_0
-  q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(1)))
-  t = Expr(:tuple)
-  for n ∈ 1:N
-    push!(t.args, last_sx)
-    new_sx = Symbol(:s_, n)
-    sz_expr = Expr(:call, getfield, :s, n, false)
-    (n == 1) && (sz_expr = :(($sz_expr + StaticInt{7}()) & StaticInt{-8}()))
-    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, sz_expr)))
-    last_sx = new_sx
-  end
-  push!(q.args, Expr(:tuple, t, last_sx))
-  q  
-end
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{StaticInt,N}}) where {T, N}
   L = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
   t = Expr(:tuple)
   for n ∈ 1:N
     push!(t.args, static_expr(L))
-    L *= s.parameters[n].parameters[1]
+    l::Int = (s.parameters[n].parameters[1])::Int
+    if (T ≢ Bit) || (n ≠ 1)
+      L *= l
+    else
+      L *= ((l + 7) & -8)
+    end
   end
   Expr(:tuple, t, static_expr(L))
 end
@@ -115,7 +110,9 @@ end
   for n ∈ 1:N
     push!(t.args, last_sx)
     new_sx = Symbol(:s_, n)
-    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:call, getfield, :s, n, false))))
+    sz_expr = Expr(:call, getfield, :s, n, false)
+    ((T === Bit) && (n == 1)) && (sz_expr = :(($sz_expr + StaticInt{7}()) & StaticInt{-8}()))
+    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, sz_expr)))
     last_sx = new_sx
   end
   push!(q.args, Expr(:tuple, t, last_sx))
@@ -126,6 +123,7 @@ end
 @inline LayoutPointers.preserve_buffer(A::StrideArray) = preserve_buffer(getfield(A, :data))
 
 @inline PtrArray(A::StrideArray) = getfield(A, :ptr)
+@inline PtrArray(A::StrideBitArray) = getfield(A, :ptr)
 
 @inline maybe_ptr_array(A) = A
 @inline maybe_ptr_array(A::AbstractArray) = maybe_ptr_array(ArrayInterface.device(A), A)
