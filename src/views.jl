@@ -110,6 +110,7 @@ end
 @generated function zview(A::PtrArray{S,D,T,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R,X,O}
   view_quote(i, K, S, D, T, N, C, B, R, X, O, true)
 end
+@inline Base.SubArray(A::AbstractStrideArray, i::Tuple{Vararg{<:Union{Integer,AbstractRange,Colon},K}}) where {K} = view(A, i...)
 
 @inline function Base.vec(A::PtrArray{S,D,T,N,C,0}) where {S,D,T,N,C}
   @assert all(D) "All dimensions must be dense for a vec view. Try `vec(copy(A))` instead."
