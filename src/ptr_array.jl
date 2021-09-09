@@ -23,14 +23,13 @@ const PtrMatrix{S,D,T,C,B,R,X,O} = PtrArray{S,D,T,2,C,B,R,X,O}
 
 @inline PtrArray(A::AbstractArray) = PtrArray(stridedpointer(A), size(A), val_dense_dims(A))
 
-@inline LayoutPointers.stridedpointer(A::PtrArray) = getfield(A, :ptr)
-@inline LayoutPointers.stridedpointer(A::BitPtrArray) = getfield(A, :ptr)
+@inline LayoutPointers.stridedpointer(A::AbstractPtrStrideArray) = getfield(A, :ptr)
 @inline Base.pointer(A::AbstractStrideArray) = pointer(stridedpointer(A))
 @inline Base.unsafe_convert(::Type{Ptr{T}}, A::AbstractStrideArray) where {T} = Base.unsafe_convert(Ptr{T}, pointer(A))
 @inline Base.elsize(::AbstractStrideArray{<:Any,<:Any,T}) where {T} = sizeof(T)
 
-@inline ArrayInterface.size(A::PtrArray) = getfield(A, :size)
-@inline LayoutPointers.bytestrides(A::PtrArray) = bytestrides(getfield(A, :ptr))
+@inline ArrayInterface.size(A::AbstractPtrStrideArray) = getfield(A, :size)
+@inline LayoutPointers.bytestrides(A::AbstractPtrStrideArray) = bytestrides(getfield(A, :ptr))
 ArrayInterface.device(::AbstractStrideArray) = ArrayInterface.CPUPointer()
 
 ArrayInterface.contiguous_axis(::Type{<:AbstractStrideArray{S,D,T,N,C}}) where {S,D,T,N,C} = StaticInt{C}()
@@ -80,6 +79,9 @@ end
 @inline function PtrArray(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}, x::Tuple{Vararg{Integer,N}}, ::Val{D}) where {T,N,D}
   PtrArray(default_stridedpointer(ptr, x), s, Val{D}())
 end
+
+@inline LayoutPointers.zero_offsets(A::AbstractPtrStrideArray{S,D}) where {S,D} = PtrArray(LayoutPointers.zero_offsets(stridedpointer(A)), size(A), Val{D}())
+
 
 
 function ptrarray_densestride_quote(::Type{T}, N, stridedpointer_offsets) where {T}

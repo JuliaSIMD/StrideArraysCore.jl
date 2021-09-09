@@ -122,19 +122,18 @@ end
 @inline LayoutPointers.preserve_buffer(A::MemoryBuffer) = A
 @inline LayoutPointers.preserve_buffer(A::StrideArray) = preserve_buffer(getfield(A, :data))
 
-@inline PtrArray(A::StrideArray) = getfield(A, :ptr)
-@inline PtrArray(A::StrideBitArray) = getfield(A, :ptr)
+@inline PtrArray(A::Union{StrideArray,StrideBitArray}) = getfield(A, :ptr)
 
 @inline maybe_ptr_array(A) = A
 @inline maybe_ptr_array(A::AbstractArray) = maybe_ptr_array(ArrayInterface.device(A), A)
 @inline maybe_ptr_array(::ArrayInterface.CPUPointer, A::AbstractArray) = PtrArray(A)
 @inline maybe_ptr_array(_, A::AbstractArray) = A
 
-@inline ArrayInterface.size(A::StrideArray) = getfield(getfield(A, :ptr), :size)
+@inline ArrayInterface.size(A::Union{StrideArray,StrideBitArray}) = getfield(getfield(A, :ptr), :size)
 
-@inline LayoutPointers.bytestrides(A::StrideArray) = bytestrides(getfield(getfield(A, :ptr), :ptr))
-@inline ArrayInterface.strides(A::StrideArray) = strides(getfield(A, :ptr))
-@inline ArrayInterface.offsets(A::StrideArray) = offsets(getfield(getfield(A, :ptr), :ptr))
+@inline LayoutPointers.bytestrides(A::Union{StrideArray,StrideBitArray}) = bytestrides(getfield(getfield(A, :ptr), :ptr))
+@inline ArrayInterface.strides(A::Union{StrideArray,StrideBitArray}) = strides(getfield(A, :ptr))
+@inline ArrayInterface.offsets(A::Union{StrideArray,StrideBitArray}) = offsets(getfield(getfield(A, :ptr), :ptr))
 
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{One}) = CloseOpen(Zero(), last(r))
 @inline zeroindex(r::Base.OneTo) = CloseOpen(Zero(), last(r))
@@ -143,7 +142,7 @@ end
 @inline zeroindex(r::CloseOpen{Zero}) = r
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{Zero}) = r
 @inline zeroindex(A::PtrArray{S,D}) where {S,D} = PtrArray(zstridedpointer(A), size(A), Val{D}())
-@inline zeroindex(A::StrideArray) = StrideArray(zeroindex(PtrArray(A)), preserve_buffer(A))
+@inline zeroindex(A::Union{StrideArray,StrideBitArray}) = StrideArray(zeroindex(PtrArray(A)), preserve_buffer(A))
 @inline zeroindex(A::StaticStrideArray) = StrideArray(zeroindex(PtrArray(A)), A)
 
 @generated rank_to_sortperm_val(::Val{R}) where {R} = :(Val{$(rank_to_sortperm(R))}())
@@ -210,4 +209,7 @@ macro gc_preserve(ex)
   @assert ex.head === :call
   gc_preserve_call(ex)
 end
+
+
+@inline LayoutPointers.zero_offsets(A::AbstractArray) = StrideArray(LayoutPointers.zero_offsets(PtrArray(A)), A)
 
