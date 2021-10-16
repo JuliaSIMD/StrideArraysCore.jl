@@ -32,16 +32,29 @@ end
 @inline function StrideArray(ptr::Ptr{T}, s::S, x::X, b, ::Val{D}) where {S,X,T,D}
   StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
 end
-@inline StrideArray(::UndefInitializer, s::Vararg{Integer,N}) where {N} = StrideArray{Float64}(undef, s)
-@inline StrideArray(::UndefInitializer, s::Tuple{Vararg{Integer,N}}) where {N} = StrideArray{Float64}(undef, s)
-@inline StrideArray(::UndefInitializer, ::Type{T}, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(undef, s)
+@inline StrideArray(f, s::Vararg{Integer,N}) where {N} = StrideArray{Float64}(f, s)
+@inline StrideArray(f, s::Tuple{Vararg{Integer,N}}) where {N} = StrideArray{Float64}(f, s)
+@inline StrideArray(f, ::Type{T}, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(f, s)
+@inline StrideArray{T}(f, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(f, s)
 @inline function StrideArray(A::PtrArray{S,D,T,N}, s::Tuple{Vararg{Integer,N}}) where {S,D,T,N}
   PtrArray(stridedpointer(A), s, val_dense_dims(A))
 end
-@inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Any,N}}) where {T,N}
+@inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Integer,N}}) where {T,N}
   StrideArray(PtrArray(stridedpointer(A), s, val_dense_dims(A)), preserve_buffer(A))
 end
-
+@inline function StrideArray{T}(f, s::Tuple{Vararg{Integer,N}}) where {T,N}
+  A = StrideArray{T}(undef, s)
+  @inbounds for i ∈ eachindex(A)
+    A[i] = f(T)
+  end
+  A
+end
+@inline function StrideArray{T}(::typeof(zero), s::Tuple{Vararg{Integer,N}}) where {T,N}
+  ptr = Ptr{T}(Libc.calloc(prod(s), sizeof(T)))
+  A = unsafe_wrap(Array{T}, ptr, s; own=true)
+  StrideArray(A)
+end
+@inline StrideArray{T}(f, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(f, s)
 mutable struct StaticStrideArray{S,D,T,N,C,B,R,X,O,L} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
   data::NTuple{L,T}
   @inline StaticStrideArray{S,D,T,N,C,B,R,X,O}(::UndefInitializer) where {S,D,T,N,C,B,R,X,O} = new{S,D,T,N,C,B,R,X,O,Int(ArrayInterface.reduce_tup(*, to_static_tuple(Val(S))))}()
@@ -64,6 +77,8 @@ end
 @inline Base.unsafe_convert(::Type{Ptr{T}}, A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
 @inline Base.pointer(A::StaticStrideArray{S,D,T}) where {S,D,T} = Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
 @inline StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T} = StaticStrideArray{T}(undef, s)
+@inline StrideArray{T}(f, s::Tuple{Vararg{StaticInt,N}}) where {N,T} = StaticStrideArray{T}(f, s)
+@inline StrideArray{T}(::typeof(zero), s::Tuple{Vararg{StaticInt,N}}) where {N,T} = StaticStrideArray{T}(zero, s) # Eager when static; assumed small
 @inline function StaticStrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T}
   StaticStrideArray{T}(undef, s, all_dense(Val(N)))
 end
@@ -117,6 +132,13 @@ end
   end
   push!(q.args, Expr(:tuple, t, last_sx))
   q
+end
+@inline function StaticStrideArray{T}(f, s::Tuple{Vararg{StaticInt,N}}) where {T,N}
+  A = StaticStrideArray{T}(undef, s)
+  @inbounds for i ∈ eachindex(A)
+    A[i] = f(T)
+  end
+  A
 end
 
 @inline LayoutPointers.preserve_buffer(A::MemoryBuffer) = A

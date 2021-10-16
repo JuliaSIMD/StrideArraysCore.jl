@@ -186,6 +186,10 @@ end
       @test C[2,3] === StrideArraysCore.zeroindex(C)[1,2] === 4.0
       @test C[3,4] === StrideArraysCore.zeroindex(C)[2,3] === -10.0
     end
+    @test all(iszero, StrideArray(zero, static(4), static(8)))
+    @test all(iszero, StrideArray(zero, 1000, 2000))
+    @test all(isone, StrideArray(one, static(4), static(8)))
+    @test all(isone, StrideArray(one, 100, 200))
   end
   @testset "views" begin
     A = StrideArray{Float64}(undef, (100,100)) .= rand.()
