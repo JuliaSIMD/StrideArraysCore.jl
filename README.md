@@ -32,6 +32,28 @@ julia> D = StrideArray{Float32}(one, static(2), static(5)) # all sizes being sta
 2×5 StrideArraysCore.StaticStrideArray{Tuple{StaticInt{2}, StaticInt{5}}, (true, true), Float32, 2, 1, 0, (1, 2), Tuple{StaticInt{4}, StaticInt{8}}, Tuple{StaticInt{1}, StaticInt{1}}, 10} with indices 1:1:2×1:1:5:
  1.0  1.0  1.0  1.0  1.0
  1.0  1.0  1.0  1.0  1.0
+
+julia> using StrideArraysCore, BenchmarkTools
+
+julia> @inline function alloctest()
+           D = StrideArray(one, static(2), static(5))
+           s = 0.0
+           for i in eachindex(D)
+               s += D[i]
+           end
+           s
+       end
+alloctest (generic function with 1 method)
+
+julia> @btime alloctest()
+  1.214 ns (0 allocations: 0 bytes)
+10.0
+
+julia> @code_llvm debuginfo=:none alloctest() # compiler compiled-away function
+define double @julia_alloctest_1199() #0 {
+L67.9:
+  ret double 1.000000e+01
+}
 ```
 
 
