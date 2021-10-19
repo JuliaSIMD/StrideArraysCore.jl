@@ -54,7 +54,6 @@ end
   A = unsafe_wrap(Array{T}, ptr, s; own=true)
   StrideArray(A)
 end
-@inline StrideArray{T}(f, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(f, s)
 mutable struct StaticStrideArray{S,D,T,N,C,B,R,X,O,L} <: AbstractStrideArray{S,D,T,N,C,B,R,X,O}
   data::NTuple{L,T}
   @inline StaticStrideArray{S,D,T,N,C,B,R,X,O}(::UndefInitializer) where {S,D,T,N,C,B,R,X,O} = new{S,D,T,N,C,B,R,X,O,Int(ArrayInterface.reduce_tup(*, to_static_tuple(Val(S))))}()
