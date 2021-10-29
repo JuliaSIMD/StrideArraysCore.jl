@@ -140,6 +140,7 @@ end
 
 @inline ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N} = __axes(A, i)
 @inline ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Int) where {S,D,T,N} = __axes(A, i)
+@inline ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, ::StaticInt{I}) where {S,D,T,N,I} = __axes(A, StaticInt{I}())
 
 @inline function __axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N}
   if i ≤ N
