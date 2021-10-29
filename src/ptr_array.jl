@@ -138,7 +138,10 @@ end
 # make the tuple homogenous before indexing
 @inline type_stable_select(t::Tuple, i::Integer) = getfield(map(Int, t), i, false)
 
-@inline function ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N}
+@inline ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N} = __axes(A, i)
+@inline ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Int) where {S,D,T,N} = __axes(A, i)
+
+@inline function __axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N}
   if i ≤ N
     o = type_stable_select(offsets(A), i)
     s = type_stable_select(size(A), i)
