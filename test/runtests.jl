@@ -80,13 +80,13 @@ end
       @test @inferred(length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), 1))) === 5
       ax1, ax2 = axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :))
       @test StrideArraysCore.ArrayInterface.known_length(ax1) == 5
-      @test StrideArraysCore.ArrayInterface.known_length(ax2) === nothing
+      @test StrideArraysCore.ArrayInterface.known_length(ax2) === StrideArraysCore.ArrayInterface.known_length(1:1)
       @test StrideArraysCore.ArrayInterface.known_first(ax1) == 0
       @test StrideArraysCore.ArrayInterface.known_first(ax2) == 0
       @test StrideArraysCore.ArrayInterface.known_step(ax1) == 1
       @test StrideArraysCore.ArrayInterface.known_step(ax2) == 1
       @test StrideArraysCore.ArrayInterface.known_last(ax1) == 4
-      @test StrideArraysCore.ArrayInterface.known_last(ax2) === nothing
+      @test StrideArraysCore.ArrayInterface.known_last(ax2) === StrideArraysCore.ArrayInterface.known_length(1:1)
     end
     W = rand(2,3,4);
     X = PtrArray(W);
