@@ -25,7 +25,7 @@ function permute_dims_expr(perm, D, C, B, R)
   end
   Dnew, Cnew, Bnew, Rnew, s, x, o
 end
-@generated function Base.permutedims(A::PtrArray{S,D,T,N,C,B,R}, ::Val{P}) where {S,D,T,N,C,B,R,P}
+@generated function Base.permutedims(A::AbstractPtrStrideArray{S,D,T,N,C,B,R}, ::Val{P}) where {S,D,T,N,C,B,R,P}
   Dnew, Cnew, Bnew, Rnew, s, x, o = permute_dims_expr(P, D, C, B, R)
   quote
     $(Expr(:meta,:inline))
@@ -43,7 +43,7 @@ end
 @inline Base.transpose(A::AbstractStrideMatrix) = permutedims(A, Val{(2,1)}())
 
 
-@generated function Base.adjoint(a::PtrArray{S,D,T,1,C,B,R,X,O}) where {S,D,T,C,B,R,X,O}
+@generated function Base.adjoint(a::AbstractPtrStrideArray{S,D,T,1,C,B,R,X,O}) where {S,D,T,C,B,R,X,O}
   s = Expr(:tuple, :(One()), Expr(:ref, :s, 1))
   x₁ = Expr(:ref, :x, 1)
   x = Expr(:tuple, x₁, x₁)

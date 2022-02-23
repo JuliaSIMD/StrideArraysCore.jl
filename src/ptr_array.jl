@@ -263,6 +263,7 @@ end
 end
 # Base.@propagate_inbounds function Base.getindex(A::AbstractStrideArray, i::Vararg{Any,K}) where {K}
 # end
+Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, i::Integer, ::Integer) = getindex(A, i)
 Base.@propagate_inbounds function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer,K}) where {K}
   b = preserve_buffer(A)
   GC.@preserve b begin
