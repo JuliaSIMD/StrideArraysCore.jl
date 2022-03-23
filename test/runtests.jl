@@ -71,7 +71,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
       @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
       @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
       @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
-      @test @inferred(StrideArraysCore.ArrayInterface.known_size(typeof(view(C, StaticInt(1):StaticInt(8), :))) === (8,nothing)
+      @test @inferred(StrideArraysCore.ArrayInterface.known_size(typeof(view(C, StaticInt(1):StaticInt(8), :)))) === (8,nothing)
 
       @test C  isa PtrArray
       @test C' isa PtrArray
