@@ -31,6 +31,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
 
   @testset "StrideArrays Basic" begin
     Acomplex = StrideArray{Complex{Float64}}(undef, (StaticInt(4), StaticInt(5)))
+    @test @inferred(StrideArraysCore.ArrayInterface.known_size(Acomplex)) === (4,5)
     Acomplex .= rand.(Complex{Float64})
     @test StrideArray(Acomplex) ===  reinterpret(reshape, Complex{Float64}, reinterpret(reshape, Float64, Acomplex))
     @test StrideArray(Acomplex) ===  reinterpret(reshape, Complex{Float64}, reinterpret(reshape, Complex{UInt64}, Acomplex))
@@ -70,6 +71,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
       @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
       @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
       @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) === StaticInt(8)
+      @test @inferred(StrideArraysCore.ArrayInterface.known_size(typeof(view(C, StaticInt(1):StaticInt(8), :))) === (8,nothing)
 
       @test C  isa PtrArray
       @test C' isa PtrArray
@@ -96,6 +98,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
     end
     W = rand(2,3,4);
     X = PtrArray(W);
+    @test @inferred(StrideArraysCore.ArrayInterface.known_size(X)) === (nothing,nothing,nothing)
     GC.@preserve W begin
       @test W == X
       @test permutedims(W, (1,2,3)) == @inferred(permutedims(X, Val((1,2,3))))

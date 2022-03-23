@@ -35,6 +35,8 @@ ArrayInterface.device(::AbstractStrideArray) = ArrayInterface.CPUPointer()
 ArrayInterface.contiguous_axis(::Type{<:AbstractStrideArray{S,D,T,N,C}}) where {S,D,T,N,C} = StaticInt{C}()
 ArrayInterface.contiguous_batch_size(::Type{<:AbstractStrideArray{S,D,T,N,C,B}}) where {S,D,T,N,C,B} = ArrayInterface.StaticInt{B}()
 
+ArrayInterface.known_size(::Type{<:AbstractStrideArray{S}}) where {S} = Static.known(S)
+
 static_expr(N::Int) = Expr(:call, Expr(:curly, :StaticInt, N))
 static_expr(b::Bool) = Expr(:call, b ? :True : :False)
 @generated function ArrayInterface.stride_rank(::Type{<:AbstractStrideArray{S,D,T,N,C,B,R}}) where {S,D,T,N,C,B,R}
