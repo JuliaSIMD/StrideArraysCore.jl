@@ -185,7 +185,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
     @test StrideArraysCore.size(D) === (StaticInt(3), StaticInt(5));
     @test StrideArraysCore.static_length(D) === StaticInt(15)
     @test D isa StrideArraysCore.StaticStrideArray
-    for C ∈ [A,B,D]
+    for C ∈ Any[A,B,D]
       @test strides(C) === (1, 3)
       @test size(C) === (3, 5);
       @test StrideArraysCore.offsets(C) === (StaticInt(1),StaticInt(1))
