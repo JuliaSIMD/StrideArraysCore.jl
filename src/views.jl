@@ -99,7 +99,7 @@ function view_quote(i, K, S, D, T, N, C, B, R, X, O, zero_offsets::Bool = false)
     x = strides(sp)
     o = offsets(sp)
     si = StrideIndex{$Nnew,$Rnew,$Cnew}($x, $o)
-    new_sp = stridedpointer(_offset_ptr(sp, $inds), si, StaticInt{$Bnew}())
+    new_sp = stridedpointer(Ptr{eltype(sp)}(_offset_ptr(sp, $inds)), si, StaticInt{$Bnew}())
     PtrArray(new_sp, $s, Val{$Dnew}())
   end
 end
@@ -110,6 +110,15 @@ end
 @generated function zview(A::PtrArray{S,D,T,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R,X,O}
   view_quote(i, K, S, D, T, N, C, B, R, X, O, true)
 end
+
+@generated function Base.view(A::BitPtrArray{S,D,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R,X,O}
+  view_quote(i, K, S, D, Bit, N, C, B, R, X, O)
+end
+@generated function zview(A::BitPtrArray{S,D,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R,X,O}
+  view_quote(i, K, S, D, Bit, N, C, B, R, X, O, true)
+end
+
+
 @inline Base.SubArray(A::AbstractStrideArray, i::Tuple{Vararg{Union{Integer,AbstractRange,Colon},K}}) where {K} = view(A, i...)
 
 @inline Base.vec(A::PtrArray{S,D,T,1,C,0}) where {S,D,T,C} = A
@@ -121,4 +130,5 @@ end
 end
 @inline Base.vec(A::StaticStrideArray{S,D,T,1}) where {S,D,T} = A
 @inline Base.vec(A::StaticStrideArray{S,D,T,N}) where {S,D,T,N} = StrideArray(vec(PtrArray(A)), A)
+
 

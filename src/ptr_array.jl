@@ -10,7 +10,7 @@ end
 @inline function PtrArray(ptr::StridedPointer{T,N,C,B,R,X,O}, size::S, ::Val{D}) where {S,D,T,N,C,B,R,X,O}
   PtrArray{S,D,T,N,C,B,R,X,O}(ptr, size)
 end
-struct BitPtrArray{S,D,N,C,B,R,X,O} <: AbstractPtrStrideArray{S,D,Bit,N,C,B,R,X,O}
+struct BitPtrArray{S,D,N,C,B,R,X,O} <: AbstractPtrStrideArray{S,D,Bool,N,C,B,R,X,O}
   ptr::StridedBitPointer{N,C,B,R,X,O}
   size::S
 end
@@ -37,19 +37,21 @@ ArrayInterface.contiguous_batch_size(::Type{<:AbstractStrideArray{S,D,T,N,C,B}})
 
 ArrayInterface.known_size(::Type{<:AbstractStrideArray{S}}) where {S} = Static.known(S)
 
-static_expr(N::Int) = Expr(:call, Expr(:curly, :StaticInt, N))
-static_expr(b::Bool) = Expr(:call, b ? :True : :False)
 @generated function ArrayInterface.stride_rank(::Type{<:AbstractStrideArray{S,D,T,N,C,B,R}}) where {S,D,T,N,C,B,R}
   t = Expr(:tuple)
   for r ∈ R
-    push!(t.args, static_expr(r::Int))
+    push!(t.args, StaticInt{r}())
   end
   t
 end
 @generated function ArrayInterface.dense_dims(::Type{<:AbstractStrideArray{S,D}}) where {S,D}
   t = Expr(:tuple)
   for d ∈ D
-    push!(t.args, static_expr(d::Bool))
+    if d
+      push!(t.args, True())
+    else
+      push!(t.args, False())
+    end
   end
   t
 end
@@ -58,8 +60,8 @@ end
 
 function onetupleexpr(N::Int)
   t = Expr(:tuple);
-  for n in 1:N
-    push!(t.args, :(One()))
+  for _ in 1:N
+    push!(t.args, One())
   end
   Expr(:block, Expr(:meta,:inline), t)
 end
@@ -97,7 +99,13 @@ function ptrarray_densestride_quote(::Type{T}, N, stridedpointer_offsets) where 
     push!(d.args, true)
     n == N && break
     new_sx = Symbol(:s_,n)
-    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, Expr(:call, GlobalRef(Core,:getfield), :s, n, false))))
+    szn = Expr(:call, GlobalRef(Core,:getfield), :s, n, false)
+    last_sx_expr = if T === Bit && n == 1
+      Expr(:call, &, Expr(:call, +, szn, static(7)), static(-8))
+    else
+      Expr(:call, *, last_sx, szn)
+    end
+    push!(q.args, Expr(:(=), new_sx, last_sx_expr))
     last_sx = new_sx
   end
   push!(q.args, :(PtrArray($stridedpointer_offsets(ptr, $t), s, Val{$d}())))
@@ -117,6 +125,9 @@ intlog2(::Type{T}) where {T} = intlog2(static_sizeof(T))
 @inline function ArrayInterface.strides(A::PtrArray{S,D,T,N}) where {S,D,T,N}
   map(Base.Fix2(>>>,intlog2(static_sizeof(T))), bytestrides(A))
 end
+@inline function ArrayInterface.strides(A::BitPtrArray{S,D,N}) where {S,D,N}
+  bytestrides(A)
+end
 
 @inline Base.size(A::AbstractStrideArray) = map(Int, size(A))
 @inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
@@ -130,6 +141,7 @@ end
 @inline Base.axes(A::AbstractStrideArray) = axes(A)
 
 @inline ArrayInterface.offsets(A::PtrArray) = offsets(getfield(A, :ptr))
+@inline ArrayInterface.offsets(A::BitPtrArray) = offsets(getfield(A, :ptr))
 @inline ArrayInterface.static_length(A::AbstractStrideArray) = ArrayInterface.reduce_tup(*, size(A))
 
 # type stable, because index known at compile time
@@ -223,7 +235,7 @@ end
 # end
 @generated function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
   ptr_expr = :(pointer(ptr))
-  T === Bit && (ptr_expr = :(reinterpret(Ptr{UInt8}, $ptr_expr)))
+  T === Bit && (ptr_expr = :(Ptr{UInt8}($ptr_expr)))
   N == 0 && return Expr(:block, Expr(:meta,:inline), ptr_expr)
   if N ≠ NI
     if (N > NI) & (NI ≠ 1)
@@ -242,7 +254,7 @@ end
     if T ≢ Bit
       push!(q.args, :(p += ($index - $offst)*$strid))
     else
-      push!(q.args, :(p += (($index - $offst)>>>3)*$strid))
+      push!(q.args, :(p += (($index - $offst)*$strid)>>>3))
     end
   end
   q
@@ -262,6 +274,26 @@ end
   j = i - oneunit(i)
   u = pload(reinterpret(Ptr{UInt8}, pointer(A)) + (j >>> 3))
   (u >>> (j & 7)) % Bool
+end
+@inline function Base.setindex!(A::BitPtrArray{S,D,N,C}, v::Bool, i::Vararg{Integer,N}) where {S,D,N,C}
+  fi = getfield(i, C) - getfield(offsets(A), C)
+  p = _offset_ptr(stridedpointer(A), i)
+  u = pload(p)
+  sh = fi & 7
+  u &= ~(0x01 << sh)
+  u |= v << sh
+  pstore!(p, u)
+  return v
+end
+@inline function Base.setindex!(A::BitPtrArray{S,D,N,C}, v::Bool, i::Integer) where {S,D,N,C}
+  j = i - oneunit(i)
+  p = Ptr{UInt8}(pointer(A)) + (j >>> 3)
+  u = pload(p)
+  sh = j & 7
+  u &= ~(0x01 << sh) # 0 bit
+  u |= v << sh
+  pstore!(p, u)
+  return v
 end
 # Base.@propagate_inbounds function Base.getindex(A::AbstractStrideArray, i::Vararg{Any,K}) where {K}
 # end

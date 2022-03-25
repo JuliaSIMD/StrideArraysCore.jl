@@ -106,7 +106,7 @@ end
   L = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
   t = Expr(:tuple)
   for n ∈ 1:N
-    push!(t.args, static_expr(L))
+    push!(t.args, StaticInt{L}())
     l::Int = (s.parameters[n].parameters[1])::Int
     if (T ≢ Bit) || (n ≠ 1)
       L *= l
@@ -114,12 +114,12 @@ end
       L *= ((l + 7) & -8)
     end
   end
-  Expr(:tuple, t, static_expr(L))
+  Expr(:tuple, t, StaticInt{L}())
 end
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Integer,N}}) where {T, N}
   last_sx = :s_0
   st = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
-  q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, static_expr(st)))
+  q = Expr(:block, Expr(:meta,:inline), Expr(:(=), last_sx, StaticInt{st}()))
   t = Expr(:tuple)
   for n ∈ 1:N
     push!(t.args, last_sx)
@@ -187,6 +187,7 @@ end
 @inline function Base.view(A::AbstractStrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
   StrideArray(view(PtrArray(A), i...), preserve_buffer(A))
 end
+
 @inline function zview(A::AbstractStrideArray, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K}
   StrideArray(zview(PtrArray(A), i...), preserve_buffer(A))
 end
@@ -233,4 +234,20 @@ end
 
 
 @inline LayoutPointers.zero_offsets(A::AbstractArray) = StrideArray(LayoutPointers.zero_offsets(PtrArray(A)), A)
+
+@generated function Base.IndexStyle(::Type{<:Union{BitPtrArray{S,D,N,C,B,R},StrideBitArray{S,D,N,C,B,R}}}) where {S,D,N,C,B,R}
+  # if is column major || is a transposed contiguous vector
+  if all(D) && ((isone(C) && R === ntuple(identity, Val(N))) || (C === 2 && R === (2,1) && S <: Tuple{One,Integer}))
+    if N > 1
+      ks1 = known(S)[1]
+      if ks1 === nothing || ((ks1 & 7) != 0)
+        return :(IndexCartesian())
+      end
+    end
+    :(IndexLinear())
+  else
+    :(IndexCartesian())
+  end
+end
+
 
