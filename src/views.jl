@@ -12,7 +12,7 @@ function rank_to_sortperm(R::NTuple{N,Int}) where {N}
 end
 rank_to_sortperm(R) = sortperm(R)
 
-function view_quote(i, K, S, D, T, N, C, B, R, X, O, zero_offsets::Bool = false)
+function view_quote(i, K, S, D, N, C, B, R, zero_offsets::Bool = false)
   @assert ((K == N) || isone(K))
 
   inds = Expr(:tuple)
@@ -104,31 +104,21 @@ function view_quote(i, K, S, D, T, N, C, B, R, X, O, zero_offsets::Bool = false)
   end
 end
 
-@generated function Base.view(A::PtrArray{S,D,T,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R,X,O}
-  view_quote(i, K, S, D, T, N, C, B, R, X, O)
+@generated function Base.view(A::PtrArray{S,D,T,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R}
+  view_quote(i, K, S, D, N, C, B, R)
 end
-@generated function zview(A::PtrArray{S,D,T,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R,X,O}
-  view_quote(i, K, S, D, T, N, C, B, R, X, O, true)
+@generated function zview(A::PtrArray{S,D,T,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R}
+  view_quote(i, K, S, D, N, C, B, R, true)
 end
 
-@generated function Base.view(A::BitPtrArray{S,D,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R,X,O}
-  view_quote(i, K, S, D, Bit, N, C, B, R, X, O)
+@generated function Base.view(A::BitPtrArray{S,D,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R}
+  view_quote(i, K, S, D, N, C, B, R)
 end
-@generated function zview(A::BitPtrArray{S,D,N,C,B,R,X,O}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R,X,O}
-  view_quote(i, K, S, D, Bit, N, C, B, R, X, O, true)
+@generated function zview(A::BitPtrArray{S,D,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R}
+  view_quote(i, K, S, D, N, C, B, R, true)
 end
 
 
 @inline Base.SubArray(A::AbstractStrideArray, i::Tuple{Vararg{Union{Integer,AbstractRange,Colon},K}}) where {K} = view(A, i...)
-
-@inline Base.vec(A::PtrArray{S,D,T,1,C,0}) where {S,D,T,C} = A
-@inline function Base.vec(A::PtrArray{S,D,T,N,C,0}) where {S,D,T,N,C}
-  @assert all(D) "All dimensions must be dense for a vec view. Try `vec(copy(A))` instead."
-  si = StrideIndex{1,(1,),1}((static_sizeof(T),), (One(),))
-  sp = stridedpointer(pointer(A), si)
-  PtrArray(sp, (static_length(A),), Val((true,)))
-end
-@inline Base.vec(A::StaticStrideArray{S,D,T,1}) where {S,D,T} = A
-@inline Base.vec(A::StaticStrideArray{S,D,T,N}) where {S,D,T,N} = StrideArray(vec(PtrArray(A)), A)
 
 

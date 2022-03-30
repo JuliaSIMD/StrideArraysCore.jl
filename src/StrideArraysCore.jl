@@ -22,6 +22,7 @@ include("ptr_array.jl")
 include("stridearray.jl")
 include("thread_compatible.jl")
 include("views.jl")
+include("reshape.jl")
 include("adjoints.jl")
 
 # function __init__()
