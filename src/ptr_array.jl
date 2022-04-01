@@ -140,6 +140,44 @@ end
 @inline ArrayInterface.axes(A::AbstractStrideArray) = map(create_axis, size(A), offsets(A))
 @inline Base.axes(A::AbstractStrideArray) = axes(A)
 
+@generated function ArrayInterface.axes_types(::Type{<:AbstractStrideArray{S,D,T,N,C,B,R,X,O}}) where {S,D,T,N,C,B,R,X,O}
+  s = known(S)
+  o = known(O)
+  t = Expr(:curly, :Tuple)
+  for i = eachindex(s,o)
+    oi = o[i]
+    si = s[i]
+     if oi === nothing
+      push!(t.args, CloseOpen{Int,Int})
+    elseif oi == 0
+      si = s[i]
+      if si === nothing
+        push!(t.args, CloseOpen{StaticInt{0},Int})
+      else
+        @assert si isa Int
+        push!(t.args, CloseOpen{StaticInt{0},StaticInt{si}})
+      end
+    elseif oi == 1
+      if si === nothing
+        push!(t.args, Base.OneTo{UInt})
+      else
+        @assert si isa Int
+        push!(t.args, ArrayInterface.OptionallyStaticUnitRange{StaticInt{1}, StaticInt{si}})
+      end
+    else
+      @assert oi isa Int
+      if si === nothing
+        push!(t.args, CloseOpen{StaticInt{oi},Int})
+      else
+        @assert si isa Int
+        push!(t.args, CloseOpen{StaticInt{oi},StaticInt{oi+si}})
+      end
+    end
+  end
+  t
+end
+
+
 @inline ArrayInterface.offsets(A::PtrArray) = offsets(getfield(A, :ptr))
 @inline ArrayInterface.offsets(A::BitPtrArray) = offsets(getfield(A, :ptr))
 @inline ArrayInterface.static_length(A::AbstractStrideArray) = ArrayInterface.reduce_tup(*, size(A))

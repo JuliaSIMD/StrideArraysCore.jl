@@ -40,6 +40,10 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
     A = rand(100, 100);
     B = copy(A);
     C = StrideArraysCore.PtrArray(A);
+    @test typeof(@inferred(StrideArraysCore.axes(Acomplex))) == @inferred(StrideArraysCore.ArrayInterface.axes_types(typeof(Acomplex)))
+    @test typeof(@inferred(StrideArraysCore.axes(C))) == @inferred(StrideArraysCore.ArrayInterface.axes_types(typeof(C)))
+    @test typeof(@inferred(StrideArraysCore.axes(StrideArraysCore.LayoutPointers.zero_offsets(Acomplex)))) == @inferred(StrideArraysCore.ArrayInterface.axes_types(typeof(StrideArraysCore.LayoutPointers.zero_offsets(Acomplex))))
+    
     @test similar(C) isa StrideArraysCore.StrideArray
     let D = similar(C,Float32)
       @test D isa StrideArraysCore.StrideArray
