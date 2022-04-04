@@ -91,9 +91,9 @@ function view_quote(i, K, S, D, N, C, B, R, zero_offsets::Bool = false)
     if (iₖt === Colon) || (iₖt <: AbstractVector)
       push!(Dnew.args, densev[k])
     end
-  end    
+  end
   quote
-    $(Expr(:meta,:inline))
+    $(Expr(:meta, :inline))
     sp = stridedpointer(A)
     s = size(A)
     x = strides(sp)
@@ -104,21 +104,34 @@ function view_quote(i, K, S, D, N, C, B, R, zero_offsets::Bool = false)
   end
 end
 
-@generated function Base.view(A::PtrArray{S,D,T,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R}
+@generated function Base.view(
+  A::PtrArray{S,D,T,N,C,B,R},
+  i::Vararg{Union{Integer,AbstractRange,Colon},K},
+) where {K,S,D,T,N,C,B,R}
   view_quote(i, K, S, D, N, C, B, R)
 end
-@generated function zview(A::PtrArray{S,D,T,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,T,N,C,B,R}
+@generated function zview(
+  A::PtrArray{S,D,T,N,C,B,R},
+  i::Vararg{Union{Integer,AbstractRange,Colon},K},
+) where {K,S,D,T,N,C,B,R}
   view_quote(i, K, S, D, N, C, B, R, true)
 end
 
-@generated function Base.view(A::BitPtrArray{S,D,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R}
+@generated function Base.view(
+  A::BitPtrArray{S,D,N,C,B,R},
+  i::Vararg{Union{Integer,AbstractRange,Colon},K},
+) where {K,S,D,N,C,B,R}
   view_quote(i, K, S, D, N, C, B, R)
 end
-@generated function zview(A::BitPtrArray{S,D,N,C,B,R}, i::Vararg{Union{Integer,AbstractRange,Colon},K}) where {K,S,D,N,C,B,R}
+@generated function zview(
+  A::BitPtrArray{S,D,N,C,B,R},
+  i::Vararg{Union{Integer,AbstractRange,Colon},K},
+) where {K,S,D,N,C,B,R}
   view_quote(i, K, S, D, N, C, B, R, true)
 end
 
 
-@inline Base.SubArray(A::AbstractStrideArray, i::Tuple{Vararg{Union{Integer,AbstractRange,Colon},K}}) where {K} = view(A, i...)
-
-
+@inline Base.SubArray(
+  A::AbstractStrideArray,
+  i::Tuple{Vararg{Union{Integer,AbstractRange,Colon},K}},
+) where {K} = view(A, i...)

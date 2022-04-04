@@ -26,11 +26,12 @@ function permute_dims_expr(perm, D, C, B, R)
   Dnew, Cnew, Bnew, Rnew, s, x, o
 end
 @generated function Base.permutedims(
-  A::AbstractPtrStrideArray{S,D,T,N,C,B,R}, ::Val{P}
+  A::AbstractPtrStrideArray{S,D,T,N,C,B,R},
+  ::Val{P},
 ) where {S,D,T,N,C,B,R,P}
   Dnew, Cnew, _, Rnew, s, x, o = permute_dims_expr(P, D, C, B, R)
   quote
-    $(Expr(:meta,:inline))
+    $(Expr(:meta, :inline))
     s = size(A)
     ptr = stridedpointer(A)
     x = strides(ptr)
@@ -41,23 +42,23 @@ end
   end
 end
 
-@inline Base.adjoint(A::AbstractStrideMatrix) = permutedims(A, Val{(2,1)}())
-@inline Base.transpose(A::AbstractStrideMatrix) = permutedims(A, Val{(2,1)}())
+@inline Base.adjoint(A::AbstractStrideMatrix) = permutedims(A, Val{(2, 1)}())
+@inline Base.transpose(A::AbstractStrideMatrix) = permutedims(A, Val{(2, 1)}())
 
 
 @generated function Base.adjoint(
-  a::AbstractPtrStrideArray{S,D,T,1,C,B,R,X,O}
+  a::AbstractPtrStrideArray{S,D,T,1,C,B,R,X,O},
 ) where {S,D,T,C,B,R,X,O}
   s = Expr(:tuple, :(One()), Expr(:ref, :s, 1))
   x₁ = Expr(:ref, :x, 1)
   x = Expr(:tuple, x₁, x₁)
   o = Expr(:tuple, :(One()), Expr(:ref, :o, 1))
   R1 = R[1]
-  Rnew = Expr(:tuple, R1+1, R1)
+  Rnew = Expr(:tuple, R1 + 1, R1)
   Dnew = Expr(:tuple, true, D[1])
   Cnew = C == 1 ? 2 : C
   quote
-    $(Expr(:meta,:inline))
+    $(Expr(:meta, :inline))
     s = size(a)
     ptr = stridedpointer(a)
     x = strides(ptr)
@@ -72,5 +73,5 @@ end
 
 @inline row_major(a::AbstractStrideVector) = a
 @inline row_major(A::AbstractStrideMatrix) = A
-@inline row_major(A::AbstractStrideArray{S,D,T,N}) where {S,D,T,N} = permutedims(A, Val(ntuple(Base.Fix1(-,N+1),Val(N))))
-
+@inline row_major(A::AbstractStrideArray{S,D,T,N}) where {S,D,T,N} =
+  permutedims(A, Val(ntuple(Base.Fix1(-, N + 1), Val(N))))

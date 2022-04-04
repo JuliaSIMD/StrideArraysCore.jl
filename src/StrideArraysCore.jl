@@ -1,14 +1,34 @@
 module StrideArraysCore
 
 using LayoutPointers, ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
-using ArrayInterface: StaticInt, Zero, One, StaticBool, True, False,
-  OptionallyStaticUnitRange, size, strides, offsets, indices,
-  static_length, static_first, static_last, axes,
-  dense_dims, stride_rank, StrideIndex, contiguous_axis_indicator
+using ArrayInterface:
+  StaticInt,
+  Zero,
+  One,
+  StaticBool,
+  True,
+  False,
+  OptionallyStaticUnitRange,
+  size,
+  strides,
+  offsets,
+  indices,
+  static_length,
+  static_first,
+  static_last,
+  axes,
+  dense_dims,
+  stride_rank,
+  StrideIndex,
+  contiguous_axis_indicator
 using LayoutPointers:
-  AbstractStridedPointer, StridedPointer, StridedBitPointer,
-  bytestrides, zstridedpointer,
-  val_dense_dims, val_stride_rank
+  AbstractStridedPointer,
+  StridedPointer,
+  StridedBitPointer,
+  bytestrides,
+  zstridedpointer,
+  val_dense_dims,
+  val_stride_rank
 using CloseOpenIntervals
 
 using ManualMemory: preserve_buffer, offsetsize, MemoryBuffer
@@ -17,7 +37,8 @@ using SIMDTypes: NativeTypes, Bit
 
 export PtrArray, StrideArray, StaticInt, static
 
-@generated static_sizeof(::Type{T}) where {T} = :(StaticInt{$(Base.allocatedinline(T) ? sizeof(T) : sizeof(Int))}())
+@generated static_sizeof(::Type{T}) where {T} =
+  :(StaticInt{$(Base.allocatedinline(T) ? sizeof(T) : sizeof(Int))}())
 include("ptr_array.jl")
 include("stridearray.jl")
 include("thread_compatible.jl")
