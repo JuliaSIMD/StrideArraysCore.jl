@@ -209,7 +209,7 @@ end
   d = Int(length(A))
   ifelse(isone(i), d, one(d))
 end
-@inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{N}) where {N} = One()
+@inline ArrayInterface.size(::AbstractStrideVector, ::StaticInt{N}) where {N} = One()
 @inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{1}) = length(A)
 @inline ArrayInterface.size(A::AbstractStrideArray, ::StaticInt{N}) where {N} = size(A)[N]
 @inline ArrayInterface.size(A::AbstractStrideArray, i::Integer) = type_stable_select(size(A), i)
@@ -405,7 +405,7 @@ end
 
 @inline function Base.getindex(A::PtrVector{S,D,T}, i::Integer) where {S,D,T}
   @boundscheck checkbounds(A, i)
-  pload(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)))
+  pload(pointer(A) + (i-ArrayInterface.offset1(A))*only(LayoutPointers.bytestrides(A)))
 end
 # @inline function Base.getindex(A::AbstractStrideVector{S,D,T}, i::Integer) where {S,D,T}
 #   b = preserve_buffer(A)
@@ -417,7 +417,7 @@ end
 # end
 @inline function Base.setindex!(A::PtrVector{S,D,T}, v, i::Integer) where {S,D,T}
   @boundscheck checkbounds(A, i)
-  pstore!(pointer(A) + (i-oneunit(i))*only(LayoutPointers.bytestrides(A)), v)
+  pstore!(pointer(A) + (i-ArrayInterface.offset1(A))*only(LayoutPointers.bytestrides(A)), v)
   v
 end
 # @inline function Base.setindex!(A::AbstractStrideVector{S,D,T}, v, i::Integer) where {S,D,T}
