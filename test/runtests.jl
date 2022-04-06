@@ -268,9 +268,9 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
   @testset "BitPtrArray" begin
     b = collect(1:10) .> 5
     @test sprint((io, t) -> show(io, t), StrideArray(b)) == """
-  SIMDTypes.Bit[false, false, false, false, false, true, true, true, true, true]"""
+Bool[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]"""
     @test sprint((io, t) -> show(io, t), StrideArray(b)') == """
-  SIMDTypes.Bit[false false false false false true true true true true]"""
+Bool[0 0 0 0 0 1 1 1 1 1]"""
   end
 
   # @testset "reinterpret" begin

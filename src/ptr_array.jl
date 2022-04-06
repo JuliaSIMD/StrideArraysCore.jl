@@ -148,13 +148,14 @@ function ptrarray_densestride_quote(::Type{T}, knowns, N, stridedpointer_offsets
       szn = Expr(:call, getfield, :s, n, false)
       new_sx = Symbol(:s_, n)
       last_sx_expr = if last_ksx != 0
-        last_ksx = 0
         # first unknown dimension
+        _last_ksx = last_ksx
+        last_ksx = 0
         if T === Bit && n == 1
           isdense = false
           Expr(:call, &, Expr(:call, +, szn, static(7)), static(-8))
         else
-          Expr(:call, *, last_ksx, szn)
+          Expr(:call, *, _last_ksx, szn)
         end
       elseif T === Bit && n == 1
         Expr(:call, &, Expr(:call, +, szn, static(7)), static(-8))
@@ -175,7 +176,6 @@ function ptrarray_densestride_quote(::Type{T}, knowns, N, stridedpointer_offsets
   q
 end
 @generated function PtrArray(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}) where {T,N}
-  1+2
   ptrarray_densestride_quote(T, known(s), N, :default_stridedpointer)
 end
 @generated function ptrarray0(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}) where {T,N}
