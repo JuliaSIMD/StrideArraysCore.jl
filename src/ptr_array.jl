@@ -126,35 +126,60 @@ end
 
 
 
-function ptrarray_densestride_quote(::Type{T}, N, stridedpointer_offsets) where {T}
+function ptrarray_densestride_quote(::Type{T}, knowns, N, stridedpointer_offsets) where {T}
   last_sx = :s_0
-  q = Expr(:block, Expr(:meta, :inline), Expr(:(=), last_sx, static_sizeof(T)))
+  isdense = true
+  last_ksx = sizeof(T)
+  q = Expr(:block, Expr(:meta, :inline))#, Expr(:(=), last_sx, static_sizeof(T)))
   t = Expr(:tuple)
   d = Expr(:tuple)
   n = 0
   while true
     n += 1
-    push!(t.args, last_sx)
-    push!(d.args, true)
-    n == N && break
-    new_sx = Symbol(:s_, n)
-    szn = Expr(:call, GlobalRef(Core, :getfield), :s, n, false)
-    last_sx_expr = if T === Bit && n == 1
-      Expr(:call, &, Expr(:call, +, szn, static(7)), static(-8))
+    if last_ksx != 0
+      push!(t.args, static(last_ksx))
     else
-      Expr(:call, *, last_sx, szn)
+      push!(t.args, last_sx)
     end
-    push!(q.args, Expr(:(=), new_sx, last_sx_expr))
-    last_sx = new_sx
+    push!(d.args, isdense)
+    n == N && break
+    curs = knowns[n]
+    if (curs === nothing) | (last_ksx == 0)
+      szn = Expr(:call, getfield, :s, n, false)
+      new_sx = Symbol(:s_, n)
+      last_sx_expr = if last_ksx != 0
+        last_ksx = 0
+        # first unknown dimension
+        if T === Bit && n == 1
+          isdense = false
+          Expr(:call, &, Expr(:call, +, szn, static(7)), static(-8))
+        else
+          Expr(:call, *, last_ksx, szn)
+        end
+      elseif T === Bit && n == 1
+        Expr(:call, &, Expr(:call, +, szn, static(7)), static(-8))
+      else
+        Expr(:call, *, last_sx, szn)
+      end
+      push!(q.args, Expr(:(=), new_sx, last_sx_expr))
+      last_sx = new_sx
+    elseif T === Bit && n == 1
+      padded = (curs + 7) & -8
+      isdense = curs == padded
+      last_ksx *= padded
+    else
+      last_ksx *= curs
+    end
   end
   push!(q.args, :(PtrArray($stridedpointer_offsets(ptr, $t), s, Val{$d}())))
   q
 end
 @generated function PtrArray(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}) where {T,N}
-  ptrarray_densestride_quote(T, N, :default_stridedpointer)
+  1+2
+  ptrarray_densestride_quote(T, known(s), N, :default_stridedpointer)
 end
 @generated function ptrarray0(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}) where {T,N}
-  ptrarray_densestride_quote(T, N, :default_zerobased_stridedpointer)
+  ptrarray_densestride_quote(T, known(s), N, :default_zerobased_stridedpointer)
 end
 
 intlog2(N::I) where {I<:Integer} = (8sizeof(I) - one(I) - leading_zeros(N)) % I

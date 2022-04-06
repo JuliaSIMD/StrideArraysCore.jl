@@ -12,7 +12,7 @@ struct StrideArray{S,D,T,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} <:
   data::A
 end
 struct StrideBitArray{S,D,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} <:
-       AbstractStrideArray{S,D,Bit,N,C,B,R,X,O}
+       AbstractStrideArray{S,D,Bool,N,C,B,R,X,O}
   ptr::BitPtrArray{S,D,N,C,B,R,X,O}
   data::A
 end
@@ -26,6 +26,9 @@ StrideArray(
 
 const StrideVector{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,1,C,B,R,X,O,A}
 const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
+
+const BitStrideArray{S,D,N,C,B,R,X,O} =
+  Union{BitPtrArray{S,D,N,C,B,R,X,O},StrideBitArray{S,D,N,C,B,R,X,O}}
 
 @inline StrideArray(A::AbstractArray) = StrideArray(PtrArray(A), A)
 
@@ -223,6 +226,9 @@ end
 end
 @inline function Base.similar(A::AbstractStrideArray{S,D,T}) where {S,D,T}
   StrideArray{T}(undef, size(A))
+end
+@inline function Base.similar(A::BitPtrArray)
+  StrideArray{Bit}(undef, size(A))
 end
 @inline function Base.similar(A::AbstractStrideArray, ::Type{T}) where {T}
   StrideArray{T}(undef, size(A))
