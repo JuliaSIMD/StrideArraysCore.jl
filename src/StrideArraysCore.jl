@@ -46,8 +46,12 @@ include("views.jl")
 include("reshape.jl")
 include("adjoints.jl")
 
-# function __init__()
+function __init__()
+  ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
+  if Base.JLOptions().check_bounds == 1
+    @eval boundscheck() = true
+  end
 #     # @require LoopVectorization="bdcacae8-1622-11e9-2a5c-532679323890" @eval using StrideArrays
-# end
+end
 
 end

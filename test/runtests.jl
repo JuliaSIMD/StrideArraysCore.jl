@@ -2,7 +2,6 @@ using StrideArraysCore, ThreadingUtilities, Aqua
 # using InteractiveUtils
 using Test
 
-StrideArraysCore.boundscheck() = true
 function closeopensum(x)
   s = zero(eltype(x))
   @inbounds @simd for i ∈ StrideArraysCore.CloseOpen(length(x))
