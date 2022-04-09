@@ -478,9 +478,10 @@ Base.@propagate_inbounds function Base.setindex!(
     PtrArray(A)[i...] = v
   end
 end
+boundscheck() = false
 # Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, i::Int, j::Int) = A[i]
 @inline function Base.getindex(A::PtrArray, i::Vararg{Integer})
-  @boundscheck checkbounds(A, i...)
+  boundscheck() && @boundscheck checkbounds(A, i...)
   pload(_offset_ptr(stridedpointer(A), i))
 end
 # @inline function Base.getindex(A::AbstractStrideArray, i::Vararg{Integer,K}) where {K}
@@ -492,7 +493,7 @@ end
 #   end
 # end
 @inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer,K}) where {K}
-  @boundscheck checkbounds(A, i...)
+  boundscheck() && @boundscheck checkbounds(A, i...)
   pstore!(_offset_ptr(stridedpointer(A), i), v)
   v
 end
@@ -506,7 +507,7 @@ end
 #   v
 # end
 @inline function Base.getindex(A::PtrArray{S,D,T}, i::Integer) where {S,D,T}
-  @boundscheck checkbounds(A, i)
+  boundscheck() && @boundscheck checkbounds(A, i)
   pload(pointer(A) + (i - oneunit(i)) * static_sizeof(T))
 end
 # @inline function Base.getindex(A::AbstractStrideArray{S,D,T}, i::Integer) where {S,D,T}
@@ -518,7 +519,7 @@ end
 #   end
 # end
 @inline function Base.setindex!(A::PtrArray{S,D,T}, v, i::Integer) where {S,D,T}
-  @boundscheck checkbounds(A, i)
+  boundscheck() && @boundscheck checkbounds(A, i)
   pstore!(pointer(A) + (i - oneunit(i)) * static_sizeof(T), v)
   v
 end
@@ -534,7 +535,7 @@ end
 
 
 @inline function Base.getindex(A::PtrVector{S,D,T}, i::Integer) where {S,D,T}
-  @boundscheck checkbounds(A, i)
+  boundscheck() && @boundscheck checkbounds(A, i)
   pload(pointer(A) + (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)))
 end
 # @inline function Base.getindex(A::AbstractStrideVector{S,D,T}, i::Integer) where {S,D,T}
@@ -546,7 +547,7 @@ end
 #   end
 # end
 @inline function Base.setindex!(A::PtrVector{S,D,T}, v, i::Integer) where {S,D,T}
-  @boundscheck checkbounds(A, i)
+  boundscheck() && @boundscheck checkbounds(A, i)
   pstore!(
     pointer(A) + (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)),
     v,
