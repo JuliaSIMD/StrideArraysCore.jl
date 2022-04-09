@@ -47,7 +47,7 @@ include("reshape.jl")
 include("adjoints.jl")
 
 function __init__()
-  ccall(:jl_generating_output, Cint, ()) == 1 || return nothing
+  ccall(:jl_generating_output, Cint, ()) == 1 && return nothing
   if Base.JLOptions().check_bounds == 1
     @eval boundscheck() = true
   end
