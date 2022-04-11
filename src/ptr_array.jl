@@ -384,7 +384,7 @@ end
     return Expr(
       :block,
       Expr(:meta, :inline),
-      :($ptr_expr + (first(i) - 1) * $(static_sizeof(T))),
+      :($ptr_expr + (first(i) - (ptr).si.offsets[1]) * $(static_sizeof(T))),
     )
   end
   sp = rank2sortperm(R)

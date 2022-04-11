@@ -274,7 +274,15 @@ Bool[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]"""
     @test sprint((io, t) -> show(io, t), StrideArray(b)') == """
 Bool[0 0 0 0 0 1 1 1 1 1]"""
   end
-
+  @testset "ptrarray0" begin
+    x = collect(0:3);
+    pzx = StrideArraysCore.ptrarray0(pointer(x), (4,))
+    GC.@preserve x begin
+      for i = 0:3
+        @test pzx[i] == pzx[i,1] == pzx[i,0] == pzx[i,-121] == i
+      end
+    end
+  end
   # @testset "reinterpret" begin
 
   # end
