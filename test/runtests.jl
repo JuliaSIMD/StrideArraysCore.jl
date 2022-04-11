@@ -279,7 +279,7 @@ Bool[0 0 0 0 0 1 1 1 1 1]"""
     pzx = StrideArraysCore.ptrarray0(pointer(x), (4,))
     GC.@preserve x begin
       for i = 0:3
-        @test pzx[i] == pzx[i,1] == pzx[i,0] == pzx[i,-121] == i
+        @test pzx[i] == pzx[i,1] == i
       end
     end
   end
