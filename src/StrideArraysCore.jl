@@ -1,13 +1,15 @@
 module StrideArraysCore
 
 using LayoutPointers, ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
-using ArrayInterface:
+using Static:
   StaticInt,
-  Zero,
-  One,
   StaticBool,
   True,
   False,
+  Zero,
+  One
+  
+using ArrayInterface:
   OptionallyStaticUnitRange,
   size,
   strides,

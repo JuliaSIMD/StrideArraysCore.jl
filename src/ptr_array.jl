@@ -181,6 +181,30 @@ end
 @generated function ptrarray0(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}) where {T,N}
   ptrarray_densestride_quote(T, known(s), N, :default_zerobased_stridedpointer)
 end
+PtrArray(ptr::Ptr, s::Tuple{Vararg{Integer}}, ::StaticInt{1}) = PtrArray(ptr, s)
+ptrarray0(ptr::Ptr, s::Tuple{Vararg{Integer}}, ::StaticInt{1}) = ptrarray0(ptr, s)
+@generated function contigperm(s::Tuple{Vararg{Integer,N}}, ::StaticInt{C}) where {N,C}
+  d = Expr(:tuple, Expr(:call, getfield, :s, C))
+  perm = Expr(:tuple)
+  resize!(perm.args, N)
+  perm.args[C] = 1
+  for n in 1:N
+    if n != C
+      push!(d.args, Expr(:call, getfield, :s, n))
+      perm.args[n] = n + (n < C)
+    end
+  end
+  Expr(:tuple, d, Expr(:call, Expr(:curly, :Val, perm)))
+end
+function PtrArray(ptr::Ptr, s::Tuple{Vararg{Integer,N}}, ::StaticInt{C}) where {C,N}
+  dim, perm = contigperm(s, static(C))
+  permutedims(PtrArray(ptr, dim), perm)
+end
+function ptrarray0(ptr::Ptr, s::Tuple{Vararg{Integer,N}}, ::StaticInt{C}) where {C,N}
+  dim, perm = contigperm(s, static(C))
+  permutedims(ptrarray0(ptr, dim), perm)
+end
+
 
 intlog2(N::I) where {I<:Integer} = (8sizeof(I) - one(I) - leading_zeros(N)) % I
 intlog2(::Type{T}) where {T} = intlog2(static_sizeof(T))
@@ -345,6 +369,8 @@ function rank2sortperm(R)
     sum(map(≥(r), R))
   end
 end
+
+
 # @generated function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
 #   if N ≠ NI
 #     if (N > NI) & (NI ≠ 1)
@@ -672,3 +698,6 @@ end
   StrideArray(reinterpret(T, PtrArray(A)), preserve_buffer(A))
 @inline Base.reinterpret(::typeof(reshape), ::Type{T}, A::AbstractStrideArray) where {T} =
   StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
+
+Base.LinearIndices(x::AbstractStrideVector) = axes(x,static(1))
+
