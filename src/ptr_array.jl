@@ -622,28 +622,42 @@ end
 @generated function Base.reinterpret(
   ::typeof(reshape),
   ::Type{Tnew},
-  A::PtrArray{S,D,Told,N,C,B,R},
-) where {S,D,Told,Tnew,N,C,B,R}
-  sz_old = sizeof(Told)
-  sz_new = sizeof(Tnew)
-  Nnew = ifelse(sz_old == sz_new, N, ifelse(sz_old < sz_new, N - 1, N + 1))
-  Bnew = ((B ≤ 0) | (sz_old == sz_new)) ? B : ((sz_old * B) ÷ sz_new)
+  A::PtrArray{S,D,Told,N,C,B,R,X,O},
+) where {S,D,Told,Tnew,N,C,B,R,X,O}
+  sz_old::Int = sizeof(Told)
+  sz_new::Int = sizeof(Tnew)
+  Nnew::Int = ifelse(sz_old == sz_new, N, ifelse(sz_old < sz_new, N - 1, N + 1))
+  Bnew::Int = ((B ≤ 0) | (sz_old == sz_new)) ? B : ((sz_old * B) ÷ sz_new)
   # sz_old < sz_new && push!(q.args, :(@assert size_A[$C] == $(sz_new ÷ sz_old)))
+  Cnew = C
   if sz_old == sz_new
     size_expr = :size_A
     bx_expr = :bx
     offs_expr = :offs
     Rnew = R
-    Cnew = C
     Dnew = D
     Nnew = N
   else
-    @assert 1 ≤ C ≤ N
     size_expr = Expr(:tuple)
     bx_expr = Expr(:tuple)
     offs_expr = Expr(:tuple)
     Rnew = Expr(:tuple)
     Dnew = Expr(:tuple)
+    if sz_old < sz_new
+      @assert 1 ≤ C ≤ N
+    else#if C < 1
+      known_offsets = known(O)
+      first_offset = if all(Base.Fix2(isa,Int), known_offsets) && all(==(first(known_offsets)), known_offsets)
+        first(known_offsets)
+      else
+        1
+      end
+      push!(offs_expr.args, static(first_offset))
+      push!(Dnew.args, true)
+      push!(Rnew.args, 1)
+      push!(size_expr.args, :(StaticInt{$(sz_old ÷ sz_new)}()))
+      push!(bx_expr.args, static(sz_new))
+    end
     for n ∈ 1:N
       sz_n = Expr(:call, GlobalRef(Core, :getfield), :size_A, n, false)
       bx_n = Expr(:call, GlobalRef(Core, :getfield), :bx, n, false)
@@ -661,17 +675,15 @@ end
         end
         push!(Rnew.args, r)
       elseif sz_old > sz_new
-        si = :(StaticInt{$(sz_old ÷ sz_new)}())
-        push!(size_expr.args, si, sz_n)
-        push!(bx_expr.args, Expr(:call, :÷, bx_n, si), bx_n)
-        push!(offs_expr.args, :(One()), of_n)
-        push!(Dnew.args, true, D[n])
-        push!(Rnew.args, 1, 1 + R[n])
+        # add an axis
+        push!(size_expr.args, sz_n)
+        push!(bx_expr.args, bx_n)
+        push!(offs_expr.args, of_n)
+        push!(Dnew.args, D[n])
+        push!(Rnew.args, 1 + R[n])
         Cnew = C
       else
-        # si = :(StaticInt{$(sz_new ÷ sz_old)}())
-        # push!(size_expr.args, Expr(:call, :÷, sz_n, si))
-        # push!(bx_expr.args, Expr(:call, :*, sz_n, si))
+        # swallow an axis
         R2ind = findfirst(==(2), R)
         Cnew = if R2ind === nothing
           0
