@@ -88,9 +88,12 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
       Cslice = view(C, 23:48, 17:89)
       @test Base.stride(Cslice,1) == Base.stride(C,1) == StrideArraysCore.stride(Cslice,1) == StrideArraysCore.stride(Cslice,static(1)) == StrideArraysCore.stride(C,1) == StrideArraysCore.stride(C,static(1))
       @test Base.stride(Cslice,2) == Base.stride(C,2) == StrideArraysCore.stride(Cslice,2) == StrideArraysCore.stride(Cslice,static(2)) == StrideArraysCore.stride(C,2) == StrideArraysCore.stride(C,static(2))
-      @test Base.stride(Cslice,3) == StrideArraysCore.stride(Cslice,3)
+      if VERSION >= v"1.9.0-DEV.569"
+        @test Base.stride(C,3) == StrideArraysCore.stride(C,3) == StrideArraysCore.stride(C,static(3))
+
+      end
       @test Base.stride(C,3) == StrideArraysCore.stride(C,3)
-      @test_broken Base.stride(C,3) == StrideArraysCore.stride(C,static(3))
+      @test Base.stride(Cslice,3) == StrideArraysCore.stride(Cslice,3) 
       @test_broken Base.stride(Cslice,3) == StrideArraysCore.stride(Cslice,static(3))
       @test Base.strides(Cslice) == Base.strides(C) == StrideArraysCore.strides(Cslice) == StrideArraysCore.strides(C)
       
