@@ -86,6 +86,10 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
 
       D = copy(A)
       Cslice = view(C, 23:48, 17:89)
+      @test Base.stride(Cslice,1) == Base.stride(C,1) == StrideArraysCore.stride(Cslice,1) == StrideArraysCore.stride(Cslice,static(1)) == StrideArraysCore.stride(C,1) == StrideArraysCore.stride(C,static(1))
+      @test Base.stride(Cslice,2) == Base.stride(C,2) == StrideArraysCore.stride(Cslice,2) == StrideArraysCore.stride(Cslice,static(2)) == StrideArraysCore.stride(C,2) == StrideArraysCore.stride(C,static(2))
+      @test Base.strides(Cslice) == Base.strides(C) == StrideArraysCore.strides(Cslice) == StrideArraysCore.strides(C)
+      
       Cslice .= 2
       @test D != C
       D[23:48, 17:89] .= 2
