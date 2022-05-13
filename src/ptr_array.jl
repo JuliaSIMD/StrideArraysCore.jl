@@ -674,7 +674,7 @@ end
         push!(Dnew.args, D[n])
         r = R[n]
         r = if sz_old > sz_new
-          r += r > C
+          r += 1#r > C
         elseif sz_old < sz_new
           r -= r > C
         end
