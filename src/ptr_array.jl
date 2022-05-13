@@ -220,6 +220,7 @@ end
 
 @inline Base.size(A::AbstractStrideArray) = map(Int, size(A))
 @inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
+@inline Base.stride(A::AbstractStrideArray, i::Int) = Base.strides(A)[i]
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
 @inline create_axis(s, ::One) = Base.OneTo(unsigned(s))
