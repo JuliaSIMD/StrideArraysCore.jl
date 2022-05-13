@@ -222,7 +222,8 @@ end
 @inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
 @inline function Base.stride(A::AbstractStrideArray, i::Int)
   x = Base.strides(A)
-  i <= length(x) ? x[i] : x[end]*Base.size(A)[end]
+  @assert i > 0
+  i <= length(x) ? @inbounds(x[i]) : x[end]*Base.size(A)[end]
 end
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
