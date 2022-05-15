@@ -12,6 +12,14 @@ end
 @inline object_and_preserve(A::AbstractArray{T}) where {T<:NativeTypes} =
   array_object_and_preserve(ArrayInterface.device(A), A)
 @inline object_and_preserve(A::AbstractArray) = (A, A)
+@inline function object_and_preserve(bc::Base.Broadcast.Broadcasted)
+  if isbits(bc.f) && isbits(bc.axes)
+    bca, bcp = object_and_preserve(bc.args)
+    Base.Broadcast.Broadcasted(bc.f, bca, bc.axes), bcp
+  else
+    bc, bc
+  end
+end
 @inline array_object_and_preserve(::ArrayInterface.CPUPointer, A::AbstractArray) =
   (PtrArray(A), preserve_buffer(A))
 @inline array_object_and_preserve(_, A::AbstractArray) = _object_and_preserve(A)
