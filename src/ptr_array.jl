@@ -225,14 +225,16 @@ end
   @assert i > 0
   i <= length(x) ? @inbounds(x[i]) : x[end]*Base.size(A)[end]
 end
+@generated _oneto(x) = Expr(:new, Base.OneTo{Int}, :(x%Int))
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
-@inline create_axis(s, ::One) = Base.OneTo(unsigned(s))
+@inline create_axis(s, ::One) = _oneto(unsigned(s))
 @inline create_axis(::StaticInt{N}, ::One) where {N} = One():StaticInt{N}()
 @inline create_axis(s, o) = CloseOpen(o, s + o)
 
 @inline ArrayInterface.axes(A::AbstractStrideArray) = map(create_axis, size(A), offsets(A))
 @inline Base.axes(A::AbstractStrideArray) = axes(A)
+
 
 @generated function ArrayInterface.axes_types(
   ::Type{<:AbstractStrideArray{S,D,T,N,C,B,R,X,O}},
@@ -255,7 +257,7 @@ end
       end
     elseif oi == 1
       if si === nothing
-        push!(t.args, Base.OneTo{UInt})
+        push!(t.args, Base.OneTo{Int})
       else
         @assert si isa Int
         push!(t.args, ArrayInterface.OptionallyStaticUnitRange{StaticInt{1},StaticInt{si}})
@@ -311,10 +313,16 @@ end
   d = Int(length(A))
   ifelse(isone(i), d, one(d))
 end
+@inline function ArrayInterface.size(A::AbstractStrideVector, i::Int)
+  d = Int(length(A))
+  ifelse(isone(i), d, one(d))
+end
 @inline ArrayInterface.size(::AbstractStrideVector, ::StaticInt{N}) where {N} = One()
 @inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{1}) = length(A)
 @inline ArrayInterface.size(A::AbstractStrideArray, ::StaticInt{N}) where {N} = size(A)[N]
 @inline ArrayInterface.size(A::AbstractStrideArray, i::Integer) =
+  type_stable_select(size(A), i)
+@inline ArrayInterface.size(A::AbstractStrideArray, i::Int) =
   type_stable_select(size(A), i)
 @inline Base.size(A::AbstractStrideArray, i::Integer) = size(A, i)
 
