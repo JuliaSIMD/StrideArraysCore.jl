@@ -277,7 +277,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
   end
   @testset "views" begin
     B0 = reshape(collect(1:12), 3, 4)
-    B1 = StrideArray(A)
+    B1 = StrideArray(B0)
     @test view(B0, :, 4:-1:1) == view(B1, :, 4:-1:1)
     @test view(B0, :, 1:2:4) == view(B1, :, 1:2:4)
     A = StrideArray{Float64}(undef, (100, 100)) .= rand.()

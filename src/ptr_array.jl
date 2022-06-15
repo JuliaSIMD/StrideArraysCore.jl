@@ -309,10 +309,6 @@ end
 end
 @inline Base.axes(A::AbstractStrideArray, i::Integer) = axes(A, i)
 
-@inline function ArrayInterface.size(A::AbstractStrideVector, i::Integer)
-  d = Int(length(A))
-  ifelse(isone(i), d, one(d))
-end
 @inline function ArrayInterface.size(A::AbstractStrideVector, i::Int)
   d = Int(length(A))
   ifelse(isone(i), d, one(d))
@@ -320,8 +316,6 @@ end
 @inline ArrayInterface.size(::AbstractStrideVector, ::StaticInt{N}) where {N} = One()
 @inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{1}) = length(A)
 @inline ArrayInterface.size(A::AbstractStrideArray, ::StaticInt{N}) where {N} = size(A)[N]
-@inline ArrayInterface.size(A::AbstractStrideArray, i::Integer) =
-  type_stable_select(size(A), i)
 @inline ArrayInterface.size(A::AbstractStrideArray, i::Int) = type_stable_select(size(A), i)
 @inline Base.size(A::AbstractStrideArray, i::Integer) = size(A, i)
 
