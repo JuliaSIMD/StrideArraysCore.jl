@@ -1,14 +1,8 @@
 module StrideArraysCore
 
 using LayoutPointers, ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
-using Static:
-  StaticInt,
-  StaticBool,
-  True,
-  False,
-  Zero,
-  One
-  
+using Static: StaticInt, StaticBool, True, False, Zero, One
+
 using ArrayInterface:
   OptionallyStaticUnitRange,
   size,
@@ -53,7 +47,7 @@ function __init__()
   if Base.JLOptions().check_bounds == 1
     @eval boundscheck() = true
   end
-#     # @require LoopVectorization="bdcacae8-1622-11e9-2a5c-532679323890" @eval using StrideArrays
+  #     # @require LoopVectorization="bdcacae8-1622-11e9-2a5c-532679323890" @eval using StrideArrays
 end
 
 end

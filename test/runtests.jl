@@ -31,7 +31,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
 
   @testset "StrideArrays Basic" begin
     @test (Base.JLOptions().check_bounds == 1) == StrideArraysCore.boundscheck()
-    
+
     Acomplex = StrideArray{Complex{Float64}}(undef, (StaticInt(4), StaticInt(5)))
     @test @inferred(StrideArraysCore.ArrayInterface.known_size(Acomplex)) === (4, 5)
     Acomplex .= rand.(Complex{Float64})
@@ -86,17 +86,32 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
 
       D = copy(A)
       Cslice = view(C, 23:48, 17:89)
-      @test Base.stride(Cslice,1) == Base.stride(C,1) == StrideArraysCore.stride(Cslice,1) == StrideArraysCore.stride(Cslice,static(1)) == StrideArraysCore.stride(C,1) == StrideArraysCore.stride(C,static(1))
-      @test Base.stride(Cslice,2) == Base.stride(C,2) == StrideArraysCore.stride(Cslice,2) == StrideArraysCore.stride(Cslice,static(2)) == StrideArraysCore.stride(C,2) == StrideArraysCore.stride(C,static(2))
+      @test Base.stride(Cslice, 1) ==
+            Base.stride(C, 1) ==
+            StrideArraysCore.stride(Cslice, 1) ==
+            StrideArraysCore.stride(Cslice, static(1)) ==
+            StrideArraysCore.stride(C, 1) ==
+            StrideArraysCore.stride(C, static(1))
+      @test Base.stride(Cslice, 2) ==
+            Base.stride(C, 2) ==
+            StrideArraysCore.stride(Cslice, 2) ==
+            StrideArraysCore.stride(Cslice, static(2)) ==
+            StrideArraysCore.stride(C, 2) ==
+            StrideArraysCore.stride(C, static(2))
       if VERSION >= v"1.9.0-DEV.569"
-        @test Base.stride(C,3) == StrideArraysCore.stride(C,3) == StrideArraysCore.stride(C,static(3))
+        @test Base.stride(C, 3) ==
+              StrideArraysCore.stride(C, 3) ==
+              StrideArraysCore.stride(C, static(3))
 
       end
-      @test Base.stride(C,3) == StrideArraysCore.stride(C,3)
-      @test Base.stride(Cslice,3) == StrideArraysCore.stride(Cslice,3) 
-      @test_broken Base.stride(Cslice,3) == StrideArraysCore.stride(Cslice,static(3))
-      @test Base.strides(Cslice) == Base.strides(C) == StrideArraysCore.strides(Cslice) == StrideArraysCore.strides(C)
-      
+      @test Base.stride(C, 3) == StrideArraysCore.stride(C, 3)
+      @test Base.stride(Cslice, 3) == StrideArraysCore.stride(Cslice, 3)
+      @test_broken Base.stride(Cslice, 3) == StrideArraysCore.stride(Cslice, static(3))
+      @test Base.strides(Cslice) ==
+            Base.strides(C) ==
+            StrideArraysCore.strides(Cslice) ==
+            StrideArraysCore.strides(C)
+
       Cslice .= 2
       @test D != C
       D[23:48, 17:89] .= 2
@@ -261,6 +276,10 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
     @test all(isone, StrideArray(one, 100, 200))
   end
   @testset "views" begin
+    B0 = reshape(collect(1:12), 3, 4)
+    B1 = StrideArray(A)
+    @test view(B0, :, 4:-1:1) == view(B1, :, 4:-1:1)
+    @test view(B0, :, 1:2:4) == view(B1, :, 1:2:4)
     A = StrideArray{Float64}(undef, (100, 100)) .= rand.()
     vA = view(A, 3:40, 2:50)
     vAslice = view(A, :, 2:50)
@@ -286,11 +305,11 @@ Bool[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]"""
 Bool[0 0 0 0 0 1 1 1 1 1]"""
   end
   @testset "ptrarray0" begin
-    x = collect(0:3);
+    x = collect(0:3)
     pzx = StrideArraysCore.ptrarray0(pointer(x), (4,))
     GC.@preserve x begin
       for i = 0:3
-        @test pzx[i] == pzx[i,1] == i
+        @test pzx[i] == pzx[i, 1] == i
       end
     end
   end

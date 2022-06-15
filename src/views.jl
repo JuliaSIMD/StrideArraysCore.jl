@@ -47,7 +47,10 @@ function view_quote(i, K, S, D, N, C, B, R, zero_offsets::Bool = false)
       if i[k] <: AbstractRange
         Nnew += 1
         push!(s.args, Expr(:call, :static_length, iₖ))
-        push!(x.args, Expr(:ref, :x, k))
+        push!(
+          x.args,
+          Expr(:call, :(*), Expr(:call, ArrayInterface.static_step, iₖ), Expr(:ref, :x, k)),
+        )
         push!(o.args, zero_offsets ? :(Zero()) : :(One()))
         if k == C
           Cnew = Nnew

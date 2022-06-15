@@ -188,7 +188,7 @@ ptrarray0(ptr::Ptr, s::Tuple{Vararg{Integer}}, ::StaticInt{1}) = ptrarray0(ptr, 
   perm = Expr(:tuple)
   resize!(perm.args, N)
   perm.args[C] = 1
-  for n in 1:N
+  for n = 1:N
     if n != C
       push!(d.args, Expr(:call, getfield, :s, n))
       perm.args[n] = n + (n < C)
@@ -223,9 +223,9 @@ end
 @inline function Base.stride(A::AbstractStrideArray, i::Int)
   x = Base.strides(A)
   @assert i > 0
-  i <= length(x) ? @inbounds(x[i]) : x[end]*Base.size(A)[end]
+  i <= length(x) ? @inbounds(x[i]) : x[end] * Base.size(A)[end]
 end
-@generated _oneto(x) = Expr(:new, Base.OneTo{Int}, :(x%Int))
+@generated _oneto(x) = Expr(:new, Base.OneTo{Int}, :(x % Int))
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
 @inline create_axis(s, ::One) = _oneto(unsigned(s))
@@ -322,8 +322,7 @@ end
 @inline ArrayInterface.size(A::AbstractStrideArray, ::StaticInt{N}) where {N} = size(A)[N]
 @inline ArrayInterface.size(A::AbstractStrideArray, i::Integer) =
   type_stable_select(size(A), i)
-@inline ArrayInterface.size(A::AbstractStrideArray, i::Int) =
-  type_stable_select(size(A), i)
+@inline ArrayInterface.size(A::AbstractStrideArray, i::Int) = type_stable_select(size(A), i)
 @inline Base.size(A::AbstractStrideArray, i::Integer) = size(A, i)
 
 
@@ -660,11 +659,13 @@ end
       @assert 1 ≤ C ≤ N
     else#if C < 1
       known_offsets = known(O)
-      first_offset = if all(Base.Fix2(isa,Int), known_offsets) && all(==(first(known_offsets)), known_offsets)
-        first(known_offsets)
-      else
-        1
-      end
+      first_offset =
+        if all(Base.Fix2(isa, Int), known_offsets) &&
+           all(==(first(known_offsets)), known_offsets)
+          first(known_offsets)
+        else
+          1
+        end
       push!(offs_expr.args, static(first_offset))
       push!(Dnew.args, true)
       push!(Rnew.args, 1)
@@ -724,5 +725,4 @@ end
 @inline Base.reinterpret(::typeof(reshape), ::Type{T}, A::AbstractStrideArray) where {T} =
   StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
 
-Base.LinearIndices(x::AbstractStrideVector) = axes(x,static(1))
-
+Base.LinearIndices(x::AbstractStrideVector) = axes(x, static(1))
