@@ -32,7 +32,7 @@ const BitStrideArray{S,D,N,C,B,R,X,O} =
 
 @inline StrideArray(A::AbstractArray) = StrideArray(PtrArray(A), A)
 
-@inline function StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{Integer,N}}) where {N,T}
+@inline function StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {N,T}
   x, L = calc_strides_len(T, s)
   b = undef_memory_buffer(T, L ÷ static_sizeof(T))
   # For now, just trust Julia's alignment heuristics are doing the right thing
@@ -43,27 +43,27 @@ end
 @inline function StrideArray(ptr::Ptr{T}, s::S, x::X, b, ::Val{D}) where {S,X,T,D}
   StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
 end
-@inline StrideArray(f, s::Vararg{Integer,N}) where {N} = StrideArray{Float64}(f, s)
-@inline StrideArray(f, s::Tuple{Vararg{Integer,N}}) where {N} = StrideArray{Float64}(f, s)
-@inline StrideArray(f, ::Type{T}, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(f, s)
-@inline StrideArray{T}(f, s::Vararg{Integer,N}) where {T,N} = StrideArray{T}(f, s)
+@inline StrideArray(f, s::Vararg{Union{Integer,StaticInt},N}) where {N} = StrideArray{Float64}(f, s)
+@inline StrideArray(f, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {N} = StrideArray{Float64}(f, s)
+@inline StrideArray(f, ::Type{T}, s::Vararg{Union{Integer,StaticInt},N}) where {T,N} = StrideArray{T}(f, s)
+@inline StrideArray{T}(f, s::Vararg{Union{Integer,StaticInt},N}) where {T,N} = StrideArray{T}(f, s)
 @inline function StrideArray(
   A::PtrArray{S,D,T,N},
-  s::Tuple{Vararg{Integer,N}},
+  s::Tuple{Vararg{Union{Integer,StaticInt},N}},
 ) where {S,D,T,N}
   PtrArray(stridedpointer(A), s, val_dense_dims(A))
 end
-@inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Integer,N}}) where {T,N}
+@inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
   StrideArray(PtrArray(stridedpointer(A), s, val_dense_dims(A)), preserve_buffer(A))
 end
-@inline function StrideArray{T}(f, s::Tuple{Vararg{Integer,N}}) where {T,N}
+@inline function StrideArray{T}(f, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
   A = StrideArray{T}(undef, s)
   @inbounds for i ∈ eachindex(A)
     A[i] = f(T)
   end
   A
 end
-@inline function StrideArray{T}(::typeof(zero), s::Tuple{Vararg{Integer,N}}) where {T,N}
+@inline function StrideArray{T}(::typeof(zero), s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
   ptr = Ptr{T}(Libc.calloc(prod(s), sizeof(T)))
   A = unsafe_wrap(Array{T}, ptr, s; own = true)
   StrideArray(A)
@@ -156,7 +156,9 @@ end
   end
   Expr(:tuple, t, StaticInt{L}())
 end
-@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Integer,N}}) where {T,N}
+function calc_strides_len(::Type{T}, ::Tuple{}) where {T}
+end
+@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
   last_sx = :s_0
   st = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
   q = Expr(:block, Expr(:meta, :inline), Expr(:(=), last_sx, StaticInt{st}()))
