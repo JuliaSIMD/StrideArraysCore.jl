@@ -220,7 +220,8 @@ end
 
 @inline Base.size(A::AbstractStrideArray) = map(Int, size(A))
 @inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
-@inline function Base.stride(A::AbstractStrideArray, i::Union{Int,StaticInt})
+@inline Base.stride(A::AbstractStrideArray, ::StaticInt{N}) where {N} = Base.stride(A, N)
+@inline function Base.stride(A::AbstractStrideArray, i::Int)
   x = Base.strides(A)
   @assert i > 0
   i <= length(x) ? @inbounds(x[i]) : x[end] * Base.size(A)[end]
