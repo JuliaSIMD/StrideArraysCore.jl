@@ -30,9 +30,6 @@ end
   (PtrArray(A), preserve_buffer(A))
 @inline array_object_and_preserve(_, A::AbstractArray) = _object_and_preserve(A)
 
-@inline object_and_preserve(r::Base.RefValue{T}) where {T} =
-  (Base.unsafe_convert(Ptr{T}, r), r)
-
 @inline function object_and_preserve(t::Tuple{T}) where {T}
   o, p = object_and_preserve(only(t))
   (o,), (p,)
