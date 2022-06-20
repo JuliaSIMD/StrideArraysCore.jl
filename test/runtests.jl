@@ -106,7 +106,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
       end
       @test Base.stride(C, 3) == StrideArraysCore.stride(C, 3)
       @test Base.stride(Cslice, 3) == StrideArraysCore.stride(Cslice, 3)
-      @test_broken Base.stride(Cslice, 3) == StrideArraysCore.stride(Cslice, static(3))
+      @test Base.stride(Cslice, 3) == StrideArraysCore.stride(Cslice, static(3))
       @test Base.strides(Cslice) ==
             Base.strides(C) ==
             StrideArraysCore.strides(Cslice) ==
