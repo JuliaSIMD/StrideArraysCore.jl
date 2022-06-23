@@ -14,10 +14,13 @@ end
   @assert all(D) "All dimensions must be dense for a reshaped view. Try `reshape(copy(A),...)` instead."
   PtrArray(pointer(A), dims)
 end
+if !(StaticInt <: Integer)
 @inline function Base.reshape(A::PtrArray{S,D}, dims::Tuple{Vararg{Base.Integer}}) where {S,D}
   @assert all(D) "All dimensions must be dense for a reshaped view. Try `reshape(copy(A),...)` instead."
   PtrArray(pointer(A), dims)
 end
+end
+
 @inline function Base.reshape(
   A::PtrArray{S,D},
   dims::Tuple{Integer,Vararg{Integer}},
@@ -25,12 +28,14 @@ end
   @assert all(D) "All dimensions must be dense for a reshaped view. Try `reshape(copy(A),...)` instead."
   PtrArray(pointer(A), dims)
 end
+if !(StaticInt <: Integer)
 @inline function Base.reshape(
   A::PtrArray{S,D},
   dims::Tuple{Base.Integer,Vararg{Base.Integer}},
 ) where {S,D}
   @assert all(D) "All dimensions must be dense for a reshaped view. Try `reshape(copy(A),...)` instead."
   PtrArray(pointer(A), dims)
+end
 end
 @inline function Base.reshape(A::PtrArray{S,D}, dims::Tuple{Vararg{Int}}) where {S,D}
   @assert all(D) "All dimensions must be dense for a reshaped view. Try `reshape(copy(A),...)` instead."
@@ -42,11 +47,13 @@ end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Integer,Vararg{Integer}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
 end
+if !(StaticInt <: Integer)
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Vararg{Base.Integer}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Base.Integer,Vararg{Base.Integer}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+end
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Vararg{Int}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
