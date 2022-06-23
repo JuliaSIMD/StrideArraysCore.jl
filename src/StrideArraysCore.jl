@@ -2,7 +2,7 @@ module StrideArraysCore
 
 using LayoutPointers, ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
 using Static: StaticInt, StaticBool, True, False, Zero, One
-const Integer = Union{StaticInt,Base.Integer}
+const Integer = Union{StaticInt,Base.BitInteger}
 
 using ArrayInterface:
   OptionallyStaticUnitRange,
