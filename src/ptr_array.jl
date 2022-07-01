@@ -337,7 +337,6 @@ end
 @inline ArrayInterface.size(A::AbstractStrideArray, i::Int) = type_stable_select(size(A), i)
 @inline Base.size(A::AbstractStrideArray, i::Union{Integer,StaticInt})::Int = size(A, i)
 
-
 # Base.IndexStyle(::Type{<:AbstractStrideArray}) = IndexCartesian()
 # Base.IndexStyle(::Type{<:AbstractStrideVector{<:Any,<:Any,<:Any,1}}) = IndexLinear()
 @generated function Base.IndexStyle(

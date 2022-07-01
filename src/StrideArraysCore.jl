@@ -10,6 +10,7 @@ using ArrayInterface:
   strides,
   offsets,
   indices,
+  length,
   static_length,
   static_first,
   static_last,
