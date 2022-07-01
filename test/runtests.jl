@@ -120,7 +120,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                         @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
                         @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) ===
                               StaticInt(8)
-                        @test @inferred((static∘size)(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) ===
+                        @test @inferred((static ∘ size)(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))) ===
                               StaticInt(8)
                         @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
                         @test @inferred(
@@ -150,11 +150,20 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                         @test @inferred(
                                 length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))
                         ) === 5
+                        if VERSION >= v"1.6"
+                                @test @inferred(
+                                        StrideArraysCore.length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))
+                                ) === StaticInt(5)
+                        else
+                                @test @inferred(
+                                        StrideArraysCore.length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))
+                                ) === 5
+                        end
                         @test @inferred(
-                                StrideArraysCore.length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))
+                                StrideArraysCore.static_length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))
                         ) === StaticInt(5)
                         @test @inferred(
-                                (static∘length)(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))
+                                (static ∘ length)(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)))
                         ) === StaticInt(5)
                         @test @inferred(
                                 length(axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), 1))
