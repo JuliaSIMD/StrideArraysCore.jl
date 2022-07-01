@@ -181,9 +181,14 @@ end
 @generated function ptrarray0(ptr::Ptr{T}, s::Tuple{Vararg{Integer,N}}) where {T,N}
   ptrarray_densestride_quote(T, known(s), N, :default_zerobased_stridedpointer)
 end
-PtrArray(ptr::Ptr, s::Tuple{Vararg{Union{Integer,StaticInt}}}, ::StaticInt{1}) = PtrArray(ptr, s)
-ptrarray0(ptr::Ptr, s::Tuple{Vararg{Union{Integer,StaticInt}}}, ::StaticInt{1}) = ptrarray0(ptr, s)
-@generated function contigperm(s::Tuple{Vararg{Union{Integer,StaticInt},N}}, ::StaticInt{C}) where {N,C}
+PtrArray(ptr::Ptr, s::Tuple{Vararg{Union{Integer,StaticInt}}}, ::StaticInt{1}) =
+  PtrArray(ptr, s)
+ptrarray0(ptr::Ptr, s::Tuple{Vararg{Union{Integer,StaticInt}}}, ::StaticInt{1}) =
+  ptrarray0(ptr, s)
+@generated function contigperm(
+  s::Tuple{Vararg{Union{Integer,StaticInt},N}},
+  ::StaticInt{C},
+) where {N,C}
   d = Expr(:tuple, Expr(:call, getfield, :s, C))
   perm = Expr(:tuple)
   resize!(perm.args, N)
@@ -196,11 +201,19 @@ ptrarray0(ptr::Ptr, s::Tuple{Vararg{Union{Integer,StaticInt}}}, ::StaticInt{1}) 
   end
   Expr(:tuple, d, Expr(:call, Expr(:curly, :Val, perm)))
 end
-function PtrArray(ptr::Ptr, s::Tuple{Vararg{Union{Integer,StaticInt},N}}, ::StaticInt{C}) where {C,N}
+function PtrArray(
+  ptr::Ptr,
+  s::Tuple{Vararg{Union{Integer,StaticInt},N}},
+  ::StaticInt{C},
+) where {C,N}
   dim, perm = contigperm(s, static(C))
   permutedims(PtrArray(ptr, dim), perm)
 end
-function ptrarray0(ptr::Ptr, s::Tuple{Vararg{Union{Integer,StaticInt},N}}, ::StaticInt{C}) where {C,N}
+function ptrarray0(
+  ptr::Ptr,
+  s::Tuple{Vararg{Union{Integer,StaticInt},N}},
+  ::StaticInt{C},
+) where {C,N}
   dim, perm = contigperm(s, static(C))
   permutedims(ptrarray0(ptr, dim), perm)
 end
@@ -284,12 +297,12 @@ end
   ArrayInterface.reduce_tup(*, size(A))
 
 # type stable, because index known at compile time
-@inline type_stable_select(t::NTuple, ::StaticInt{N}) where {N} = getfield(t, N, false)
-@inline type_stable_select(t::Tuple, ::StaticInt{N}) where {N} = getfield(t, N, false)
+@inline type_stable_select(t::NTuple, ::StaticInt{N}) where {N} = getfield(t, N)
+@inline type_stable_select(t::Tuple, ::StaticInt{N}) where {N} = getfield(t, N)
 # type stable, because tuple is homogenous
-@inline type_stable_select(t::NTuple, i::Integer) = getfield(t, i, false)
+@inline type_stable_select(t::NTuple, i::Integer) = getfield(t, i)
 # make the tuple homogenous before indexing
-@inline type_stable_select(t::Tuple, i::Integer) = getfield(map(Int, t), i, false)
+@inline type_stable_select(t::Tuple, i::Integer) = getfield(map(Int, t), i)
 
 @inline ArrayInterface._axes(A::AbstractStrideArray{S,D,T,N}, i::Integer) where {S,D,T,N} =
   __axes(A, i)
@@ -300,7 +313,10 @@ end
   ::StaticInt{I},
 ) where {S,D,T,N,I} = __axes(A, StaticInt{I}())
 
-@inline function __axes(A::AbstractStrideArray{S,D,T,N}, i::Union{Integer,StaticInt}) where {S,D,T,N}
+@inline function __axes(
+  A::AbstractStrideArray{S,D,T,N},
+  i::Union{Integer,StaticInt},
+) where {S,D,T,N}
   if i ≤ N
     o = type_stable_select(offsets(A), i)
     s = type_stable_select(size(A), i)
@@ -319,7 +335,7 @@ end
 @inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{1}) = length(A)
 @inline ArrayInterface.size(A::AbstractStrideArray, ::StaticInt{N}) where {N} = size(A)[N]
 @inline ArrayInterface.size(A::AbstractStrideArray, i::Int) = type_stable_select(size(A), i)
-@inline Base.size(A::AbstractStrideArray, i::Union{Integer,StaticInt}) = size(A, i)
+@inline Base.size(A::AbstractStrideArray, i::Union{Integer,StaticInt})::Int = size(A, i)
 
 
 # Base.IndexStyle(::Type{<:AbstractStrideArray}) = IndexCartesian()
@@ -456,7 +472,10 @@ end
   u = pload(_offset_ptr(stridedpointer(A), i))
   (u >>> (fi & 7)) % Bool
 end
-@inline function Base.getindex(A::BitPtrArray{S,D,N,C}, i::Union{Integer,StaticInt}) where {S,D,N,C}
+@inline function Base.getindex(
+  A::BitPtrArray{S,D,N,C},
+  i::Union{Integer,StaticInt},
+) where {S,D,N,C}
   j = i - oneunit(i)
   u = pload(reinterpret(Ptr{UInt8}, pointer(A)) + (j >>> 3))
   (u >>> (j & 7)) % Bool
