@@ -509,6 +509,10 @@ end
 end
 # Base.@propagate_inbounds function Base.getindex(A::AbstractStrideArray, i::Vararg{Any,K}) where {K}
 # end
+Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, i::Integer, ::Colon) =
+  view(A, i, :)
+Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, ::Colon, ::Integer) = A
+
 Base.@propagate_inbounds Base.getindex(A::AbstractStrideVector, i::Integer, ::Integer) =
   getindex(A, i)
 Base.@propagate_inbounds function Base.getindex(
@@ -519,6 +523,12 @@ Base.@propagate_inbounds function Base.getindex(
   GC.@preserve b begin
     PtrArray(A)[i...]
   end
+end
+Base.@propagate_inbounds function Base.getindex(
+  A::AbstractStrideArray,
+  i::Vararg{Union{Integer,StaticInt,Colon,AbstractRange},K},
+) where {K}
+  view(A, i...)
 end
 Base.@propagate_inbounds function Base.setindex!(
   A::AbstractStrideArray,

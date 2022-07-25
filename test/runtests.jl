@@ -295,10 +295,12 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
         @testset "views" begin
                 B0 = reshape(collect(1:12), 3, 4)
                 B1 = StrideArray(B0)
-                @test view(B0, :, 4:-1:1) == view(B1, :, 4:-1:1)
-                @test view(B0, :, 1:2:4) == view(B1, :, 1:2:4)
+                @test view(B0, :, 4:-1:1) == view(B1, :, 4:-1:1) == B1[:, 4:-1:1]
+                @test view(B0, :, 1:2:4) == view(B1, :, 1:2:4) == B1[:,1:2:4]
+                @test view(B1, :, 4:-1:1) === B1[:, 4:-1:1]
                 A = StrideArray{Float64}(undef, (100, 100)) .= rand.()
                 vA = view(A, 3:40, 2:50)
+                @test vA === A[3:40, 2:50]
                 vAslice = view(A, :, 2:50)
                 vaslice = view(A, 2:50, 4)
                 x = StrideArray{Float64}(undef, (100,)) .= rand.()
