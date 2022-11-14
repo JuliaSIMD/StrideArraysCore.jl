@@ -16,7 +16,7 @@ Note, bounds checking is still disabled when using `@inbounds`, even if `boundsc
 Starting Julia with `--check-bounds=yes` will automatically redefine `StrideArraysCore.boundscheck() = true`.
 
 
-Defines the core `PtrArray` type so that some libraries can make use of it internally wihout the need for cicular dependencies. [StrideArrays](https://github.com/chriselrod/StrideArrays.jl) extends this type with many methods and functionality. It is recommended you depend on and use `StrideArrays` instead.
+Defines the core `PtrArray` type so that some libraries can make use of it internally wihout the need for circular dependencies. [StrideArrays](https://github.com/chriselrod/StrideArrays.jl) extends this type with many methods and functionality. It is recommended you depend on and use `StrideArrays` instead.
 
 
 Example initialization:
