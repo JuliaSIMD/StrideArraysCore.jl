@@ -6,29 +6,22 @@
 @inline undef_memory_buffer(::Type{Bit}, L) = Vector{UInt8}(undef, (L + 7) >>> 3)
 # @inline undef_memory_buffer(::Type{Bit}, L) = BitVector(undef, L)
 
-struct StrideArray{S,D,T,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} <:
-       AbstractStrideArray{S,D,T,N,C,B,R,X,O}
-  ptr::PtrArray{S,D,T,N,C,B,R,X,O}
+struct AbstractStrideArrayImpl{T,N,R,S,X,O,P,A} <: AbstractStrideArray{T,N,R,S,X,O}
+  ptr::AbstractPtrArray{T,N,R,S,X,O,P}
   data::A
 end
-struct StrideBitArray{S,D,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} <:
-       AbstractStrideArray{S,D,Bool,N,C,B,R,X,O}
-  ptr::BitPtrArray{S,D,N,C,B,R,X,O}
-  data::A
-end
-StrideArray(
-  ptr::BitPtrArray{S,D,N,C,B,R,X,O},
-  data::A,
-) where {S,D,N,C,B,R,X,O,A<:Union{MemoryBuffer,AbstractArray}} =
-  StrideBitArray{S,D,N,C,B,R,X,O,A}(ptr, data)
-@inline LayoutPointers.stridedpointer(A::StrideArray) = getfield(getfield(A, :ptr), :ptr)
-@inline LayoutPointers.stridedpointer(A::StrideBitArray) = getfield(getfield(A, :ptr), :ptr)
+const StrideArray{T,N,R,S,X,O,A} = AbstractStrideArrayImpl{T,N,R,S,X,O,T,A}
+const StrideArray0{T,N,R,S,X,A} = AbstractStrideArrayImpl{T,N,R,S,X,NTuple{N,Zero},T,A}
+const StrideArray1{T,N,R,S,X,A} = AbstractStrideArrayImpl{T,N,R,S,X,NTuple{N,One},T,A}
+const BitStrideArray{N,R,S,X,O,A} = AbstractStrideArrayImpl{Bool,N,R,S,X,O,Bit,A}
+const BitStrideArray0{N,R,S,X,A} = AbstractStrideArrayImpl{Bool,N,R,S,X,NTuple{N,Zero},Bit,A}
+const BitStrideArray1{N,R,S,X,A} = AbstractStrideArrayImpl{Bool,N,R,S,X,NTuple{N,One},Bit,A}
 
-const StrideVector{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,1,C,B,R,X,O,A}
-const StrideMatrix{S,D,T,C,B,R,X,O,A} = StrideArray{S,D,T,2,C,B,R,X,O,A}
+const StrideVector{T,R,S,X,O,A} = StrideArray{T,1,R,S,X,O,A}
+const StrideMatrix{T,R,S,X,O,A} = StrideArray{T,2,R,S,X,O,A}
 
-const BitStrideArray{S,D,N,C,B,R,X,O} =
-  Union{BitPtrArray{S,D,N,C,B,R,X,O},StrideBitArray{S,D,N,C,B,R,X,O}}
+# const BitStrideArray{N,R,S,X,O} =
+#   Union{BitPtrArray{N,R,S,X,O},StrideBitArray{N,R,S,X,O}}
 
 @inline StrideArray(A::AbstractArray) = StrideArray(PtrArray(A), A)
 
@@ -68,16 +61,16 @@ end
   A = unsafe_wrap(Array{T}, ptr, s; own = true)
   StrideArray(A)
 end
-mutable struct StaticStrideArray{S,D,T,N,C,B,R,X,O,L} <:
-               AbstractStrideArray{S,D,T,N,C,B,R,X,O}
+mutable struct StaticStrideArray{T,N,R,S,X,O,L} <:
+               AbstractStrideArray{T,N,R,S,X,O}
   data::NTuple{L,T}
-  @inline StaticStrideArray{S,D,T,N,C,B,R,X,O}(
+  @inline StaticStrideArray{T,N,R,S,X,O}(
     ::UndefInitializer,
-  ) where {S,D,T,N,C,B,R,X,O} =
-    new{S,D,T,N,C,B,R,X,O,Int(ArrayInterface.reduce_tup(*, to_static_tuple(Val(S))))}()
-  @inline StaticStrideArray{S,D,T,N,C,B,R,X,O,L}(
+  ) where {T,N,R,S,X,O} =
+    new{T,N,R,S,X,O,Int(ArrayInterface.reduce_tup(*, to_static_tuple(Val(S))))}()
+  @inline StaticStrideArray{T,N,R,S,X,O,L}(
     ::UndefInitializer,
-  ) where {S,D,T,N,C,B,R,X,O,L} = new{S,D,T,N,C,B,R,X,O,L}()
+  ) where {T,N,R,S,X,O,L} = new{T,N,R,S,X,O,L}()
 end
 
 @generated function to_static_tuple(::Val{S}) where {S}
@@ -143,7 +136,7 @@ end
 @generated all_dense(::Val{N}) where {N} = dense_quote(N, true)
 
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{StaticInt,N}}) where {T,N}
-  L = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
+  L = 1#Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
   t = Expr(:tuple)
   for n ∈ 1:N
     push!(t.args, StaticInt{L}())
@@ -160,7 +153,7 @@ function calc_strides_len(::Type{T}, ::Tuple{}) where {T}
 end
 @generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
   last_sx = :s_0
-  st = Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
+  st = 1#Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
   q = Expr(:block, Expr(:meta, :inline), Expr(:(=), last_sx, StaticInt{st}()))
   t = Expr(:tuple)
   for n ∈ 1:N
