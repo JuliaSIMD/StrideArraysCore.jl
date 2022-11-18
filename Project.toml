@@ -1,7 +1,7 @@
 name = "StrideArraysCore"
 uuid = "7792a7ef-975c-4747-a70f-980b88e8d1da"
 authors = ["Chris Elrod <elrodc@gmail.com> and contributors"]
-version = "0.3.15"
+version = "0.3.16"
 
 [deps]
 ArrayInterface = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
@@ -20,7 +20,7 @@ IfElse = "0.1"
 LayoutPointers = "0.1.1"
 ManualMemory = "0.1.6"
 SIMDTypes = "0.1"
-Static = "0.3.1, 0.4, 0.5, 0.6, 0.7"
+Static = "0.3.1, 0.4, 0.5, 0.6, 0.7, 0.8"
 ThreadingUtilities = "0.4.5, 0.5"
 julia = "1.6"
 
