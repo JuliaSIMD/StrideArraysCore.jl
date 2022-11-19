@@ -65,6 +65,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                 )
 
                 @test similar(C) isa StrideArraysCore.StrideArray
+                @test view(C, :) === vec(C)
                 let D = similar(C, Float32)
                         @test D isa StrideArraysCore.StrideArray
                         @test eltype(D) === Float32

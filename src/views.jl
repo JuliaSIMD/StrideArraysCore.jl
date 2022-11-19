@@ -132,7 +132,8 @@ end
 ) where {K,S,D,N,C,B,R}
   view_quote(i, K, S, D, N, C, B, R, true)
 end
-
+@inline Base.view(A::PtrArray, ::Colon) = vec(A)
+@inline zview(A::PtrArray, ::Colon) = vec(A)
 
 @inline Base.SubArray(
   A::AbstractStrideArray,
