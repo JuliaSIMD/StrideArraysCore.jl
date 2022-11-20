@@ -26,7 +26,8 @@ using LayoutPointers:
   bytestrides,
   zstridedpointer,
   val_dense_dims,
-  val_stride_rank
+  val_stride_rank,
+  zero_offsets
 using CloseOpenIntervals
 
 using ManualMemory: preserve_buffer, offsetsize, MemoryBuffer

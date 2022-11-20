@@ -20,18 +20,23 @@ const BitStrideArray1{N,R,S,X,A} = AbstractStrideArrayImpl{Bool,N,R,S,X,NTuple{N
 const StrideVector{T,R,S,X,O,A} = StrideArray{T,1,R,S,X,O,A}
 const StrideMatrix{T,R,S,X,O,A} = StrideArray{T,2,R,S,X,O,A}
 
+@inline function StrideArray(B::AbstractPtrArray{T,N,R,S,X,O,P}, data::A) where {T,N,R,S,X,O,A,P}
+  AbstractStrideArrayImpl{T,N,R,S,X,O,P,A}(B, data)
+end
+
 # const BitStrideArray{N,R,S,X,O} =
 #   Union{BitPtrArray{N,R,S,X,O},StrideBitArray{N,R,S,X,O}}
 
 @inline StrideArray(A::AbstractArray) = StrideArray(PtrArray(A), A)
 
 @inline function StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {N,T}
-  x, L = calc_strides_len(T, s)
-  b = undef_memory_buffer(T, L ÷ static_sizeof(T))
+  L = Static.reduce_tup(*, s)
+  b = undef_memory_buffer(T, L)
   # For now, just trust Julia's alignment heuristics are doing the right thing
   # to save us from having to over-allocate
   # ptr = LayoutPointers.align(pointer(b))
-  StrideArray(reinterpret(Ptr{T}, pointer(b)), s, x, b, all_dense(Val{N}()))
+  A = PtrArray(pointer(b), s, ntuple(Returns(nothing), Val(N)), ntuple(Returns(One()), Val(N)), Val(ntuple(identity,Val(N))))
+  StrideArray(A, b)
 end
 @inline function StrideArray(ptr::Ptr{T}, s::S, x::X, b, ::Val{D}) where {S,X,T,D}
   StrideArray(PtrArray(ptr, s, x, Val{D}()), b)
@@ -41,13 +46,18 @@ end
 @inline StrideArray(f, ::Type{T}, s::Vararg{Union{Integer,StaticInt},N}) where {T,N} = StrideArray{T}(f, s)
 @inline StrideArray{T}(f, s::Vararg{Union{Integer,StaticInt},N}) where {T,N} = StrideArray{T}(f, s)
 @inline function StrideArray(
-  A::PtrArray{S,D,T,N},
+  A::PtrArray{T,N},
   s::Tuple{Vararg{Union{Integer,StaticInt},N}},
-) where {S,D,T,N}
+) where {T,N}
   PtrArray(stridedpointer(A), s, val_dense_dims(A))
 end
-@inline function StrideArray(A::AbstractArray{T,N}, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
-  StrideArray(PtrArray(stridedpointer(A), s, val_dense_dims(A)), preserve_buffer(A))
+@inline function StrideArray(A::AbstractArray{T,N}, sz::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
+  # what is the point of this method? Why not `view(PtrArray(A), ...)`?
+  p = pointer(A)
+  sx = _sparse_strides(dense_dims(A), strides(A))
+  R = map(Int, stride_rank(A))
+  B = PtrArray(p, sz, sx, offsets(A), Val(R))
+  StrideArray(B, preserve_buffer(A))
 end
 @inline function StrideArray{T}(f, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
   A = StrideArray{T}(undef, s)
@@ -57,7 +67,7 @@ end
   A
 end
 @inline function StrideArray{T}(::typeof(zero), s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
-  ptr = Ptr{T}(Libc.calloc(prod(s), sizeof(T)))
+  ptr = Ptr{T}(Libc.calloc(prod(map(Int,s)), sizeof(T)))
   A = unsafe_wrap(Array{T}, ptr, s; own = true)
   StrideArray(A)
 end
@@ -80,94 +90,35 @@ end
   end
   t
 end
-@inline ArrayInterface.size(::StaticStrideArray{S}) where {S} = to_static_tuple(Val(S))
+
+@inline ArrayInterface.size(::StaticStrideArray{<:Any,<:Any,<:Any,S}) where {S} = to_static_tuple(Val(S))
 @inline function ArrayInterface.strides(
-  ::StaticStrideArray{S,D,T,N,C,B,R,X},
-) where {S,D,T,N,C,B,R,X}
-  map(Base.Fix2(>>>, intlog2(static_sizeof(T))), to_static_tuple(Val(X)))
+  A::StaticStrideArray{<:Any,N,R}
+) where {N,R}
+  _strides(size(A), ntuple(Returns(nothing), Val{N}()), Val{R}())
 end
-@inline LayoutPointers.bytestrides(
-  ::StaticStrideArray{S,D,T,N,C,B,R,X},
-) where {S,D,T,N,C,B,R,X} = to_static_tuple(Val(X))
 @inline ArrayInterface.offsets(
-  ::StaticStrideArray{S,D,T,N,C,B,R,X,O},
-) where {S,D,T,N,C,B,R,X,O} = to_static_tuple(Val(O))
-@inline Base.unsafe_convert(::Type{Ptr{T}}, A::StaticStrideArray{S,D,T}) where {S,D,T} =
+  ::StaticStrideArray{T,N,R,S,X,O},
+) where {T,N,R,S,X,O} = to_static_tuple(Val(O))
+@inline Base.unsafe_convert(::Type{Ptr{T}}, A::StaticStrideArray{T}) where {T} =
   Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
-@inline Base.pointer(A::StaticStrideArray{S,D,T}) where {S,D,T} =
+@inline Base.pointer(A::StaticStrideArray{T}) where {T} =
   Base.unsafe_convert(Ptr{T}, pointer_from_objref(A))
+
 @inline StrideArray{T}(::UndefInitializer, s::Tuple{Vararg{StaticInt,N}}) where {N,T} =
   StaticStrideArray{T}(undef, s)
 @inline StrideArray{T}(f, s::Tuple{Vararg{StaticInt,N}}) where {N,T} =
   StaticStrideArray{T}(f, s)
 @inline StrideArray{T}(::typeof(zero), s::Tuple{Vararg{StaticInt,N}}) where {N,T} =
   StaticStrideArray{T}(zero, s) # Eager when static; assumed small
-@inline function StaticStrideArray{T}(
-  ::UndefInitializer,
-  s::Tuple{Vararg{StaticInt,N}},
-) where {N,T}
-  StaticStrideArray{T}(undef, s, all_dense(Val(N)))
-end
-@inline function LayoutPointers.bytestrideindex(
-  A::StaticStrideArray{S,D,T,N,C,B,R},
-) where {S,D,T,N,C,B,R}
-  StrideIndex{N,R,C}(LayoutPointers.bytestrides(A), offsets(A))
-end
 
 @inline function StaticStrideArray{T}(
   ::UndefInitializer,
-  s::Tuple{Vararg{StaticInt,N}},
-  ::Val{D},
-) where {N,T,D}
-  x, L = calc_strides_len(T, s)
-  R = ntuple(Int, Val(N))
-  O = ntuple(_ -> One(), Val(N))
-  Tshifter = intlog2(static_sizeof(T))
-  StaticStrideArray{typeof(s),D,T,N,1,0,R,typeof(x),typeof(O),Int(L >>> Tshifter)}(undef)
+  s::S,
+) where {N,T,S<:Tuple{Vararg{StaticInt,N}}}
+  StaticStrideArray{T,N,ntuple(identity,Val(N)),S,NTuple{N,Nothing},NTuple{N,One}}(undef)
 end
 
-function dense_quote(N::Int, b::Bool)
-  d = Expr(:tuple)
-  for n = 1:N
-    push!(d.args, b)
-  end
-  Expr(:call, Expr(:curly, :Val, d))
-end
-@generated all_dense(::Val{N}) where {N} = dense_quote(N, true)
-
-@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{StaticInt,N}}) where {T,N}
-  L = 1#Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
-  t = Expr(:tuple)
-  for n ∈ 1:N
-    push!(t.args, StaticInt{L}())
-    l::Int = (s.parameters[n].parameters[1])::Int
-    if (T ≢ Bit) || (n ≠ 1)
-      L *= l
-    else
-      L *= ((l + 7) & -8)
-    end
-  end
-  Expr(:tuple, t, StaticInt{L}())
-end
-function calc_strides_len(::Type{T}, ::Tuple{}) where {T}
-end
-@generated function calc_strides_len(::Type{T}, s::Tuple{Vararg{Union{Integer,StaticInt},N}}) where {T,N}
-  last_sx = :s_0
-  st = 1#Base.allocatedinline(T) ? sizeof(T) : sizeof(Int)
-  q = Expr(:block, Expr(:meta, :inline), Expr(:(=), last_sx, StaticInt{st}()))
-  t = Expr(:tuple)
-  for n ∈ 1:N
-    push!(t.args, last_sx)
-    new_sx = Symbol(:s_, n)
-    sz_expr = Expr(:call, getfield, :s, n, false)
-    ((T === Bit) && (n == 1)) &&
-      (sz_expr = :(($sz_expr + StaticInt{7}()) & StaticInt{-8}()))
-    push!(q.args, Expr(:(=), new_sx, Expr(:call, *, last_sx, sz_expr)))
-    last_sx = new_sx
-  end
-  push!(q.args, Expr(:tuple, t, last_sx))
-  q
-end
 @inline function StaticStrideArray{T}(f, s::Tuple{Vararg{StaticInt,N}}) where {T,N}
   A = StaticStrideArray{T}(undef, s)
   @inbounds for i ∈ eachindex(A)
@@ -179,22 +130,18 @@ end
 @inline LayoutPointers.preserve_buffer(A::MemoryBuffer) = A
 @inline LayoutPointers.preserve_buffer(A::StrideArray) = preserve_buffer(getfield(A, :data))
 
-@inline PtrArray(A::Union{StrideArray,StrideBitArray}) = getfield(A, :ptr)
+@inline PtrArray(A::StrideArray) = getfield(A, :ptr)
 
 @inline maybe_ptr_array(A) = A
 @inline maybe_ptr_array(A::AbstractArray) = maybe_ptr_array(ArrayInterface.device(A), A)
 @inline maybe_ptr_array(::ArrayInterface.CPUPointer, A::AbstractArray) = PtrArray(A)
 @inline maybe_ptr_array(_, A::AbstractArray) = A
 
-@inline ArrayInterface.size(A::Union{StrideArray,StrideBitArray}) =
-  getfield(getfield(A, :ptr), :size)
+@inline ArrayInterface.size(A::StrideArray) =
+  getfield(getfield(A, :ptr), :sizes)
 
-@inline LayoutPointers.bytestrides(A::Union{StrideArray,StrideBitArray}) =
-  bytestrides(getfield(getfield(A, :ptr), :ptr))
-@inline ArrayInterface.strides(A::Union{StrideArray,StrideBitArray}) =
-  strides(getfield(A, :ptr))
-@inline ArrayInterface.offsets(A::Union{StrideArray,StrideBitArray}) =
-  offsets(getfield(getfield(A, :ptr), :ptr))
+@inline ArrayInterface.strides(A::StrideArray) = strides(getfield(A, :ptr))
+@inline ArrayInterface.offsets(A::StrideArray) = offsets(getfield(A, :ptr))
 
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{One}) =
   CloseOpen(Zero(), last(r))
@@ -203,14 +150,12 @@ end
 
 @inline zeroindex(r::CloseOpen{Zero}) = r
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{Zero}) = r
-@inline zeroindex(A::PtrArray{S,D}) where {S,D} =
-  PtrArray(zstridedpointer(A), size(A), Val{D}())
-@inline zeroindex(A::Union{StrideArray,StrideBitArray}) =
-  StrideArray(zeroindex(PtrArray(A)), preserve_buffer(A))
-@inline zeroindex(A::StaticStrideArray) = StrideArray(zeroindex(PtrArray(A)), A)
+
+@inline LayoutPointers.zero_offsets(A::StrideArray) = StrideArray(LayoutPointers.zero_offsets(PtrArray(A)), preserve_buffer(A))
+@inline LayoutPointers.zero_offsets(A::StaticStrideArray) = StrideArray(LayoutPointers.zero_offsets(PtrArray(A)), A)
 
 @generated rank_to_sortperm_val(::Val{R}) where {R} = :(Val{$(rank_to_sortperm(R))}())
-@inline function similar_layout(A::AbstractStrideArray{S,D,T,N,C,B,R}) where {S,D,T,N,C,B,R}
+@inline function similar_layout(A::AbstractStrideArray{T,N,R}) where {T,N,R}
   permutedims(similar(permutedims(A, rank_to_sortperm_val(Val{R}()))), Val{R}())
 end
 @inline function similar_layout(A::AbstractArray)
@@ -219,7 +164,7 @@ end
     similar_layout(PtrArray(A))
   end
 end
-@inline function Base.similar(A::AbstractStrideArray{S,D,T}) where {S,D,T}
+@inline function Base.similar(A::AbstractStrideArray{T}) where {T}
   StrideArray{T}(undef, size(A))
 end
 @inline function Base.similar(A::BitPtrArray)
@@ -246,8 +191,10 @@ end
 @inline function Base.permutedims(A::AbstractStrideArray, ::Val{P}) where {P}
   StrideArray(permutedims(PtrArray(A), Val{P}()), preserve_buffer(A))
 end
-@inline Base.adjoint(a::AbstractStrideVector) =
-  StrideArray(adjoint(PtrArray(a)), preserve_buffer(a))
+@inline Base.adjoint(a::AbstractStrideVector{<:Real}) =
+  StrideArray(transpose(PtrArray(a)), preserve_buffer(a))
+@inline Base.transpose(a::AbstractStrideVector) =
+  StrideArray(transpose(PtrArray(a)), preserve_buffer(a))
 
 
 function gc_preserve_call(ex, skip = 0)
@@ -291,12 +238,12 @@ end
   StrideArray(LayoutPointers.zero_offsets(PtrArray(A)), A)
 
 @generated function Base.IndexStyle(
-  ::Type{<:Union{BitPtrArray{S,D,N,C,B,R},StrideBitArray{S,D,N,C,B,R}}},
-) where {S,D,N,C,B,R}
+  ::Type{<:Union{<:BitPtrArray{N,R,S,NTuple{N,Nothing}},<:StrideArray{Bit,N,R,S,NTuple{N,Nothing}}}},
+) where {N,R,S}
   # if is column major || is a transposed contiguous vector
-  if all(D) && (
-    (isone(C) && R === ntuple(identity, Val(N))) ||
-    (C === 2 && R === (2, 1) && S <: Tuple{One,Integer})
+  if (
+    (R === ntuple(identity, Val(N))) ||
+    (R === (2, 1) && S <: Tuple{One,Integer})
   )
     if N > 1
       ks1 = known(S)[1]

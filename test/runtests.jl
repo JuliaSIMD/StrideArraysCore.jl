@@ -77,7 +77,8 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
 
                         # @code_llvm closeopensum(A)
                         @test closeopensumfastmath(C) == closeopensumfastmath(A)
-                        @test sum(C) == sum(A)
+                        @test foldl(+,C) == foldl(+,A)
+                        # @test sum(C) == sum(A)
                         @test closeopensum(C) ≈ closeopensumfastmath(C) ≈ sum(C)
                         @test A == B
                         C .*= 3
@@ -281,12 +282,12 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                         @test strides(C) === (1, 3)
                         @test size(C) === (3, 5)
                         @test StrideArraysCore.offsets(C) === (StaticInt(1), StaticInt(1))
-                        @test StrideArraysCore.offsets(StrideArraysCore.zeroindex(C)) ===
+                        @test StrideArraysCore.offsets(StrideArraysCore.zero_offsets(C)) ===
                               (StaticInt(0), StaticInt(0))
                         C[2, 3] = 4
-                        StrideArraysCore.zeroindex(C)[2, 3] = -10
-                        @test C[2, 3] === StrideArraysCore.zeroindex(C)[1, 2] === 4.0
-                        @test C[3, 4] === StrideArraysCore.zeroindex(C)[2, 3] === -10.0
+                        StrideArraysCore.zero_offsets(C)[2, 3] = -10
+                        @test C[2, 3] === StrideArraysCore.zero_offsets(C)[1, 2] === 4.0
+                        @test C[3, 4] === StrideArraysCore.zero_offsets(C)[2, 3] === -10.0
                 end
                 @test all(iszero, StrideArray(zero, static(4), static(8)))
                 @test all(iszero, StrideArray(zero, 1000, 2000))
@@ -324,9 +325,9 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                 @test sprint((io, t) -> show(io, t), StrideArray(b)') == """
             Bool[0 0 0 0 0 1 1 1 1 1]"""
         end
-        @testset "ptrarray0" begin
+        @testset "PtrArray0" begin
                 x = collect(0:3)
-                pzx = StrideArraysCore.ptrarray0(pointer(x), (4,))
+                pzx = StrideArraysCore.PtrArray0(pointer(x), (4,))
                 GC.@preserve x begin
                         for i = 0:3
                                 @test pzx[i] == pzx[i, 1] == i

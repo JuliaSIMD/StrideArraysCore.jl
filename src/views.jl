@@ -169,20 +169,20 @@ function view_quote(
         i_n = Symbol(:i_,n)
         push!(q.args, Expr(:(=), i_n, Expr(:call, getfield, :i, j)))
         i_first_n = Symbol(:i_first_,n)
-        push!(q.args, Expr(:(=), i_first_n, Expr(:call, first, i_n)))
+        push!(q.args, Expr(:(=), i_first_n, Expr(:call, static_first, i_n)))
         i_off_n_sym = i_first_n
         dim_n = Symbol(:dim_,n)
         fast_len = if (I_n <: AbstractUnitRange) || ArrayInterface.known_step(I_n) === 1
           fast_len = Expr(
             :call, +,
-            Expr(:call, -, Expr(:call, last, i_n), i_first_n), static(1)
+            Expr(:call, -, Expr(:call, static_last, i_n), i_first_n), static(1)
           )
         else
           step_n = Symbol(:step_,n)
           push!(q.args, Expr(:(=), step_n, Expr(:call, ArrayInterface.static_step, i_n)))
           Expr(
             :call, +, static(1),
-            Expr(:call, ÷, Expr(:call, -, Expr(:call, last, i_n), i_first_n), step_n)
+            Expr(:call, ÷, Expr(:call, -, Expr(:call, static_last, i_n), i_first_n), step_n)
           )
         end
         push!(q.args, Expr(:(=), dim_n, fast_len))
