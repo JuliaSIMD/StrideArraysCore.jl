@@ -15,23 +15,64 @@ end
   end
   Expr(:block,Expr(:meta,:inline), t)
 end
+
+@inline _strides(::Tuple{}, ::Tuple{}) = ()
 @inline _strides(::Tuple{}, ::Tuple{}, prev) = ()
+
+struct StrideReset{T}; x::T; end
+
+# sizes M x N
+# strides nothing x nothing -> static(1) x M
+# strides L x nothing -> L x L*M
+# strides nothing x K -> static(1) x K
+# strides L x K -> L x L*K
 @inline function _strides(
   sizes::Tuple{Integer,Vararg{Integer,N}},
-  strides::Tuple{Integer,Vararg{Any,N}}, _
+  strides::Tuple{Integer,Vararg{Any,N}}, prev::Integer
+) where {N}
+  next = prev*first(strides)
+  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
+end
+@inline function _strides(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{Nothing,Vararg{Any,N}}, prev::Integer
+) where {N}
+  next = prev*first(sizes)
+  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
+end
+@inline function _strides(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{StrideReset{T},Vararg{Any,N}}, ::Integer
+) where {N,T}
+  next = getfield(first(strides), :x)
+  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
+end
+
+@inline function _strides(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{Integer,Vararg{Any,N}}
 ) where {N}
   prev = first(strides)
-  (prev, _strides(Base.tail(sizes), Base.tail(strides), prev*first(sizes))...)
+  (prev, _strides(Base.front(sizes), Base.tail(strides), prev)...)
 end
 @inline function _strides(
   sizes::Tuple{Integer,Vararg{Integer,N}},
-  strides::Tuple{Nothing,Vararg{Any,N}}, prev
-) where {N}
-  (prev, _strides(Base.tail(sizes), Base.tail(strides), prev*first(sizes))...)
+  strides::Tuple{StrideReset{T},Vararg{Any,N}}
+) where {N,T}
+  next = getfield(first(strides), :x)
+  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
 end
+@inline function _strides(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{Nothing,Vararg{Any,N}}
+) where {N}
+  prev = static(1)
+  (prev, _strides(Base.front(sizes), Base.tail(strides), prev)...)
+end
+
 @inline function _strides(sizes, strides, ::Val{R}) where {R}
   VR = Val{R}()
-  sx = _strides(invpermtuple(sizes, VR), invpermtuple(strides, VR), static(1))
+  sx = _strides(invpermtuple(sizes, VR), invpermtuple(strides, VR))
   permtuple(sx, VR)
 end
 
@@ -53,12 +94,6 @@ struct AbstractPtrArray{T,N,R,S,X,O,P} <: AbstractPtrStrideArray{T,N,R,S,X,O}
   strides::X
   offsets::O
 end
-function PtrArray(
-  ptr::Ptr{T}, sizes::S, strides::X, offsets::O, ::Val{R}
-) where {T,N,R,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
-  PtrArray{T,N,R,S,X,O}(ptr, sizes, strides, offsets)
-end
-
 const PtrArray{T,N,R,S,X,O} = AbstractPtrArray{T,N,R,S,X,O,T}
 const PtrArray0{T,N,R,S,X} = AbstractPtrArray{T,N,R,S,X,NTuple{N,Zero},T}
 const PtrArray1{T,N,R,S,X} = AbstractPtrArray{T,N,R,S,X,NTuple{N,One},T}
@@ -66,45 +101,74 @@ const BitPtrArray{N,R,S,X,O} = AbstractPtrArray{Bool,N,R,S,X,O,Bit}
 const BitPtrArray0{N,R,S,X} = AbstractPtrArray{Bool,N,R,S,X,NTuple{N,Zero},Bit}
 const BitPtrArray1{N,R,S,X} = AbstractPtrArray{Bool,N,R,S,X,NTuple{N,One},Bit}
 
+# function PtrArray(
+#   ptr::Ptr{T}, sizes::S, strides::X, offsets::O, ::Val{R}
+# ) where {T,N,R,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
+#   PtrArray{T,N,R,S,X,O}(ptr, sizes, strides, offsets)
+# end
+
+
+@inline function AbstractPtrArray(
+  p::Ptr{T}, sz::S, sx::X, so::O, ::Val{R}
+) where {N,T,R,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
+  AbstractPtrArray{T,N,R,S,X,O,T}(p, sz, sx, so)
+end
+@inline function AbstractPtrArray(
+  p::Ptr{Bit}, sz::S, sx::X, so::O, ::Val{R}
+) where {N,R,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
+  AbstractPtrArray{Bool,N,R,S,X,O,Bit}(p, sz, sx, so)
+end
+
+@inline function AbstractPtrArray(
+  p::Ptr{T}, sz::S, sx::X, so::O
+) where {N,T,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
+  AbstractPtrArray{T,N,ntuple(identity,Val(N)),S,X,O,T}(p, sz, sx, so)
+end
+@inline function AbstractPtrArray(
+  p::Ptr{Bit}, sz::S, sx::X, so::O
+) where {N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
+  AbstractPtrArray{Bool,N,ntuple(identity,Val(N)),S,X,O,Bit}(p, sz, sx, so)
+end
+
 @inline function PtrArray(p::Ptr{T}, sz::S, ::Val{R}) where {T,N,S<:Tuple{Vararg{Integer,N}},R}
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(1)), Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 @inline function PtrArray0(p::Ptr{T}, sz::S, ::Val{R}) where {T,N,S<:Tuple{Vararg{Integer,N}},R}
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(0)), Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 @inline function PtrArray(p::Ptr{T}, sz::S, sx::X, ::Val{R}) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},R}
   o = ntuple(Returns(static(1)), Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 @inline function PtrArray0(p::Ptr{T}, sz::S, sx::X, ::Val{R}) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},R}
   o = ntuple(Returns(static(0)), Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 @inline function PtrArray(p::Ptr{T}, sz::S) where {T,N,S<:Tuple{Vararg{Integer,N}}}
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(1)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 @inline function PtrArray0(p::Ptr{T}, sz::S) where {T,N,S<:Tuple{Vararg{Integer,N}}}
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(0)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 @inline function PtrArray(p::Ptr{T}, sz::S, sx::X) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}}}
   o = ntuple(Returns(static(1)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 @inline function PtrArray0(p::Ptr{T}, sz::S, sx::X) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}}}
   o = ntuple(Returns(static(0)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(ptr, sz, sx, o)
+  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(p, sz, sx, o)
 end
 
 @generated function _nondense_strides(
@@ -162,12 +226,12 @@ end
 @inline function PtrArray(
   p::Ptr{T}, sz::S, sx::X, offsets::O, ::Val{R}
 ) where {T,N,R,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
-  PtrArray{T,N,R,S,X,O,T}(p, sz, sx, offsets)
+  AbstractPtrArray{T,N,R,S,X,O,T}(p, sz, sx, offsets)
 end
 @inline function PtrArray(
   p::Ptr{Bit}, sz::S, sx::X, offsets::O, ::Val{R}
 ) where {N,R,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},O<:Tuple{Vararg{Integer,N}}}
-  PtrArray{Bool,N,R,S,X,O,Bit}(p, sz, sx, offsets)
+  AbstractPtrArray{Bool,N,R,S,X,O,Bit}(p, sz, sx, offsets)
 end
 @inline function PtrArray(A::AbstractArray{T,N}) where {T,N}
   p = pointer(A)
@@ -254,7 +318,7 @@ end
 @inline sparse_strides(A::AbstractPtrStrideArray) = getfield(A, :strides)
 
 @inline function LayoutPointers.zero_offsets(A::AbstractPtrStrideArray{<:Any,N,R}) where {N,R}
-  PtrArray(pointer(A), sizes(A), sparse_strides(A), ntuple(Returns(static(0)), Val(N)))
+  PtrArray(pointer(A), size(A), sparse_strides(A), ntuple(Returns(static(0)), Val(N)))
 end
 
 #=
@@ -303,12 +367,12 @@ intlog2(::Type{T}) where {T} = intlog2(static_sizeof(T))
 
 @inline Base.size(A::AbstractStrideArray) = map(Int, size(A))
 @inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
-@inline Base.stride(A::AbstractStrideArray, ::StaticInt{N}) where {N} = Base.stride(A, N)
 @inline function Base.stride(A::AbstractStrideArray, i::Int)
   x = Base.strides(A)
   @assert i > 0
-  i <= length(x) ? @inbounds(x[i]) : x[end] * Base.size(A)[end]
+  i <= length(x) ? @inbounds(x[i]) : last(x) * Int(last(size(A)))
 end
+@inline Base.stride(A::AbstractStrideArray, ::StaticInt{N}) where {N} = Base.stride(A, N::Int)
 @generated _oneto(x) = Expr(:new, Base.OneTo{Int}, :(x % Int))
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
@@ -322,8 +386,8 @@ end
 
 
 @generated function ArrayInterface.axes_types(
-  ::Type{<:AbstractStrideArray{S,D,T,N,C,B,R,X,O}},
-) where {S,D,T,N,C,B,R,X,O}
+  ::Type{<:AbstractStrideArray{T,N,R,S,X,O}},
+) where {S,T,N,R,X,O}
   s = known(S)
   o = known(O)
   t = Expr(:curly, :Tuple)
@@ -362,8 +426,7 @@ end
 
 
 @inline ArrayInterface.offsets(A::PtrArray) = getfield(A, :offsets)
-@inline ArrayInterface.static_length(A::AbstractStrideArray) =
-  ArrayInterface.reduce_tup(*, size(A))
+@inline ArrayInterface.static_length(A::AbstractStrideArray) = Static.reduce_tup(*, size(A))
 
 # type stable, because index known at compile time
 @inline type_stable_select(t::NTuple, ::StaticInt{N}) where {N} = getfield(t, N)
@@ -383,9 +446,9 @@ end
 ) where {S,D,T,N,I} = __axes(A, StaticInt{I}())
 
 @inline function __axes(
-  A::AbstractStrideArray{S,D,T,N},
+  A::AbstractStrideArray{T,N,R,S},
   i::Union{Integer,StaticInt},
-) where {S,D,T,N}
+) where {S,R,T,N}
   if i ≤ N
     o = type_stable_select(offsets(A), i)
     s = type_stable_select(size(A), i)
@@ -423,7 +486,7 @@ end
   end
 end
 
-@inline LayoutPointers.preserve_buffer(A::PtrArray) = nothing
+@inline ManualMemory.preserve_buffer(::PtrArray) = nothing
 
 
 @generated function pload(p::Ptr{T}) where {T}
@@ -696,9 +759,6 @@ end
 #   v
 # end
 
-@inline LayoutPointers.bytestrideindex(A::AbstractStrideArray{T}) where {T} =
-  StrideIndex(stridedpointer(A))
-
 _scale(::False, x, _, __) = x
 @inline function _scale(::True, x, num, denom)
   cmp = Static.gt(num, denom)
@@ -729,10 +789,9 @@ end
   ::typeof(reshape),
   ::Type{Tnew},
   A::PtrArray{Told,N,R,S,X,O},
-) where {Told,Tnew,N,C,B,R,X,O}
+) where {Told,Tnew,N,S,R,X,O}
   sz_old::Int = sizeof(Told)::Int
   sz_new::Int = sizeof(Tnew)::Int
-  Nnew::Int = ifelse(sz_old == sz_new, N, ifelse(sz_old < sz_new, N - 1, N + 1))
   # sz_old < sz_new && push!(q.args, :(@assert size_A[$C] == $(sz_new ÷ sz_old)))
   if sz_old == sz_new
     size_expr = :s
@@ -779,10 +838,9 @@ end
       elseif sz_old > sz_new
         # add an axis
         push!(size_expr.args, sz_n)
-        push!(stride_expr.args, bx_n)
+        push!(stride_expr.args, sx_n)
         push!(offs_expr.args, of_n)
         push!(Rnew.args, 1 + R[n])
-        Cnew = C
       end
     end
   end
