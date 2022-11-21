@@ -36,6 +36,11 @@ using SIMDTypes: NativeTypes, Bit
 
 export PtrArray, StrideArray, StaticInt, static
 
+@static if VERSION < v"1.7"
+  struct Returns{T}; x::T; end
+  (r::Returns)(args...) = r.x
+end
+
 @generated static_sizeof(::Type{T}) where {T} =
   :(StaticInt{$(Base.allocatedinline(T) ? sizeof(T) : sizeof(Int))}())
 include("ptr_array.jl")
