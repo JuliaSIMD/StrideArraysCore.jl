@@ -36,6 +36,12 @@ end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Int})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
 end
+@inline function Base.reshape(A::StrideArray, dims::Tuple{Vararg{Int}})
+  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+end
+@inline function Base.reshape(A::StrideArray, dims::Tuple{Int,Vararg{Int}})
+  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Int,Int,Vararg{Int}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
 end
