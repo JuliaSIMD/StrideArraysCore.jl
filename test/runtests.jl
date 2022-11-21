@@ -182,8 +182,8 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                         @test StrideArraysCore.ArrayInterface.known_last(ax2) ===
                               StrideArraysCore.ArrayInterface.known_length(1:1)
                 end
-                W = rand(2, 3, 4)
-                X = PtrArray(W)
+                W = rand(2, 3, 4);
+                X = PtrArray(W);
                 @test @inferred(StrideArraysCore.ArrayInterface.known_size(X)) ===
                       (nothing, nothing, nothing)
                 GC.@preserve W begin

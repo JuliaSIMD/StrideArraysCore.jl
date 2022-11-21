@@ -12,105 +12,8 @@ function rank_to_sortperm(R::NTuple{N,Int}) where {N}
 end
 rank_to_sortperm(R) = sortperm(R)
 
-function view_quote(i, K, S, D, N, C, B, R, zero_offsets::Bool)
-  @assert ((K == N) || isone(K))
-
-  inds = Expr(:tuple)
-  Nnew = 0
-  s = Expr(:tuple)
-  x = Expr(:tuple)
-  o = Expr(:tuple)
-  Rnew = Expr(:tuple)
-  Dnew = Expr(:tuple)
-  Cnew = -1
-  Bnew = ifelse(iszero(B), 0, -1)
-  sortp = rank_to_sortperm(R)
-  still_dense = true
-  densev = Vector{Bool}(undef, K)
-  for k ∈ 1:K
-    iₖ = Expr(:ref, :i, k)
-    if i[k] === Colon
-      Nnew += 1
-      push!(inds.args, Expr(:ref, :o, k))
-      push!(s.args, Expr(:ref, :s, k))
-      push!(x.args, Expr(:ref, :x, k))
-      push!(o.args, zero_offsets ? :(Zero()) : :(One()))
-      if k == C
-        Cnew = Nnew
-      end
-      if k == B
-        Bnew = Nnew
-      end
-      push!(Rnew.args, R[k])
-    else
-      push!(inds.args, Expr(:call, :first, iₖ))
-      if i[k] <: AbstractRange
-        Nnew += 1
-        push!(s.args, Expr(:call, :static_length, iₖ))
-        push!(
-          x.args,
-          Expr(:call, :(*), Expr(:call, ArrayInterface.static_step, iₖ), Expr(:ref, :x, k)),
-        )
-        push!(o.args, zero_offsets ? :(Zero()) : :(One()))
-        if k == C
-          Cnew = Nnew
-        end
-        if k == B
-          Bnew = Nnew
-        end
-        push!(Rnew.args, R[k])
-      end
-    end
-    spₙ = sortp[k]
-    still_dense &= D[spₙ]
-    if still_dense# && (D[spₙ])
-      ispₙ = i[spₙ]
-      still_dense = (ispₙ <: AbstractUnitRange) || (ispₙ === Colon)
-      densev[spₙ] = still_dense
-      if still_dense
-        still_dense = if ((ispₙ === Colon)::Bool || (ispₙ <: Base.Slice)::Bool)
-          true
-        else
-          ispₙ_len = ArrayInterface.known_length(ispₙ)
-          if ispₙ_len !== nothing
-            _sz = getfield(S, :parameters)[spₙ]
-            if _sz <: StaticInt
-              ispₙ_len == getfield(_sz, :parameters)[1]
-            else
-              false
-            end
-          else
-            false
-          end
-          false
-        end
-      end
-    else
-      densev[spₙ] = false
-    end
-  end
-  for k ∈ 1:K
-    iₖt = i[k]
-    if (iₖt === Colon) || (iₖt <: AbstractVector)
-      push!(Dnew.args, densev[k])
-    end
-  end
-  quote
-    $(Expr(:meta, :inline))
-    sp = stridedpointer(A)
-    s = size(A)
-    x = strides(sp)
-    o = offsets(sp)
-    si = StrideIndex{$Nnew,$Rnew,$Cnew}($x, $o)
-    new_sp = stridedpointer(Ptr{eltype(sp)}(_offset_ptr(sp, $inds)), si, StaticInt{$Bnew}())
-    PtrArray(new_sp, $s, Val{$Dnew}())
-  end
-end
-
-
-
 function view_quote(
-  @nospecialize(I), N::Int, R::Vector{Int}, @nospecialize(S), @nospecialize(X), @nospecialize(O),
+  @nospecialize(I), N::Int, R::Vector{Int}, @nospecialize(X),
   st::Int, bit::Bool, zero_offsets::Bool
 )
   q = Expr(:block, Expr(:meta,:inline), :(sz = $getfield(A,:sizes)), :(sx = $getfield(A, :strides)))
@@ -270,6 +173,7 @@ function view_quote(
           prev_stride = prev_stride_n
         end
       else
+        nonunit_step = !((I_n_colon) || (I_n<:AbstractUnitRange) || (ArrayInterface.known_step(I_n) === 1))
         if prev_nonunit_step
           sr_expr = Expr(:call, getfield, Expr(:call, strides, :A), j)
           prev_stride = Symbol(:prev_stride_, n)
@@ -286,16 +190,25 @@ function view_quote(
               x_n = x_n_scaled
             end
           end
-          if !x_nothing
-            push!(sx_expr.args, x_n)
-          elseif I_p_colon
-            push!(sx_expr.args, nothing)
+          if nonunit_step
+            step_n = Symbol(:step_,n)
+            if x_nothing
+              push!(sx_expr.args, Expr(:call, :*, Symbol(:s_, n-1), step_n))
+            else
+              push!(sx_expr.args, Expr(:call, :*, x_n, step_n))
+            end
           else
-            push!(sx_expr.args, Symbol(:s_, n-1))
+            if !x_nothing
+              push!(sx_expr.args, x_n)
+            elseif I_p_colon
+              push!(sx_expr.args, nothing)
+            else
+              push!(sx_expr.args, Symbol(:s_, n-1))
+            end
           end
         end
         prev_stride = :null
-        prev_nonunit_step = !((I === Colon) || (I_n<:AbstractUnitRange) || (ArrayInterface.known_step(I_n) === 1))
+        prev_nonunit_step = nonunit_step
       end
       j_prev = j
       I_p = I_n
@@ -334,7 +247,7 @@ end
   for n = 1:N
     r[n] = R[n]
   end
-  view_quote(i, N, r, S, X, O, sizeof(T), P===Bit, false)
+  view_quote(i, N, r, X, sizeof(T), P===Bit, false)
 end
 @generated function zview(
   A::AbstractPtrArray{T,N,R,S,X,O,P},
@@ -344,11 +257,14 @@ end
   for n = 1:N
     r[n] = R[n]
   end
-  view_quote(i, N, r, S, X, O, sizeof(T), P===Bit, true)
+  view_quote(i, N, r, X, sizeof(T), P===Bit, true)
 end
 
-@inline Base.view(A::PtrArray, ::Colon) = vec(A)
-@inline zview(A::PtrArray, ::Colon) = vec(A)
+@inline Base.view(A::AbstractPtrArray, ::Colon) = vec(A)
+@inline zview(A::AbstractPtrArray, ::Colon) = vec(A)
+
+@inline Base.view(A::AbstractPtrVector, ::Colon) = A
+@inline zview(A::AbstractPtrVector, ::Colon) = A
 
 @inline Base.SubArray(
   A::AbstractStrideArray,

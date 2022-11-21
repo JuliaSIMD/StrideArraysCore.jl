@@ -9,7 +9,8 @@ end
 @inline function Base.reshape(A::PtrArray{T,N,R,S,NTuple{N,Nothing}}, dims::Tuple{Vararg{Integer}}) where {T,N,R,S}
   PtrArray(pointer(A), dims)
 end
-if !(StaticInt <: Integer)
+
+if !(StaticInt <: Base.Integer)
 @inline function Base.reshape(A::PtrArray{T,N,R,S,NTuple{N,Nothing}}, dims::Tuple{Vararg{Base.Integer}}) where {T,N,R,S}
   PtrArray(pointer(A), dims)
 end
@@ -25,6 +26,11 @@ end
 end
 
 end
+
+@inline function Base.reshape(A::PtrArray{T,N,R,S,NTuple{N,Nothing}}, dims::Tuple{Vararg{Int}}) where {T,N,R,S}
+  PtrArray(pointer(A), dims)
+end
+
 
 @inline function Base.reshape(A::PtrArray{T,N,R,S,NTuple{N,Nothing}}, ::Tuple{}) where {T,N,R,S}
   PtrArray(pointer(A), ())

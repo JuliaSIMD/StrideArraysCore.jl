@@ -23,6 +23,18 @@ const StrideMatrix{T,R,S,X,O,A} = StrideArray{T,2,R,S,X,O,A}
 @inline function StrideArray(B::AbstractPtrArray{T,N,R,S,X,O,P}, data::A) where {T,N,R,S,X,O,A,P}
   AbstractStrideArrayImpl{T,N,R,S,X,O,P,A}(B, data)
 end
+function StrideArray(::AbstractPtrArray, ::Integer)
+  throw("StrideArray(::AbstractPtrArray, ::Integer) doesn't make any sense.")
+end
+function StrideArray(::AbstractPtrArray, ::Type{T}) where {T}
+  throw("StrideArray(::AbstractPtrArray, ::Type{$T}) doesn't make any sense.")
+end
+function StrideArray(::AbstractPtrArray, ::Tuple{Vararg{Integer}})
+  throw("StrideArray(::AbstractPtrArray, ::Tuple{Vararg{Integer}}) doesn't make any sense.")
+end
+
+@inline Base.pointer(A::AbstractStrideArrayImpl) = pointer(getfield(A,:ptr))
+@inline PtrArray(A::AbstractStrideArrayImpl) = getfield(A,:ptr)
 
 # const BitStrideArray{N,R,S,X,O} =
 #   Union{BitPtrArray{N,R,S,X,O},StrideBitArray{N,R,S,X,O}}
@@ -137,11 +149,11 @@ end
 @inline maybe_ptr_array(::ArrayInterface.CPUPointer, A::AbstractArray) = PtrArray(A)
 @inline maybe_ptr_array(_, A::AbstractArray) = A
 
-@inline ArrayInterface.size(A::StrideArray) =
+@inline ArrayInterface.size(A::AbstractStrideArrayImpl) =
   getfield(getfield(A, :ptr), :sizes)
 
-@inline ArrayInterface.strides(A::StrideArray) = strides(getfield(A, :ptr))
-@inline ArrayInterface.offsets(A::StrideArray) = offsets(getfield(A, :ptr))
+@inline ArrayInterface.strides(A::AbstractStrideArrayImpl) = strides(getfield(A, :ptr))
+@inline ArrayInterface.offsets(A::AbstractStrideArrayImpl) = offsets(getfield(A, :ptr))
 
 @inline zeroindex(r::ArrayInterface.OptionallyStaticUnitRange{One}) =
   CloseOpen(Zero(), last(r))

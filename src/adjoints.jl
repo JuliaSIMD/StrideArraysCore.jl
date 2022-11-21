@@ -33,12 +33,14 @@ end
 @inline function Base.transpose(
   a::AbstractPtrArray{<:Any,1}
 )
-  AbstractPtrArray(pointer(a), (One(), static_length(a)), (StrideReset(One()), getfield(getfield(a,:strides), 1)), Val{(2,1)}())
+  sx = getfield(getfield(a,:strides), 1)
+  so = getfield(getfield(a,:offsets), 1)
+  AbstractPtrArray(pointer(a), (One(), static_length(a)), (sx, sx), (so, so), Val{(2,1)}())
 end
 @inline Base.adjoint(a::AbstractPtrArray{<:Real}) = transpose(a)
 
 
 @inline row_major(a::AbstractStrideVector) = a
 @inline row_major(A::AbstractStrideMatrix) = transpose(A)
-@inline row_major(A::AbstractStrideArray{S,D,T,N}) where {S,D,T,N} =
+@inline row_major(A::AbstractStrideArray{T,N}) where {T,N} =
   permutedims(A, Val(ntuple(Base.Fix1(-, N + 1), Val(N))))
