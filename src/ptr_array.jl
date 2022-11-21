@@ -263,8 +263,6 @@ end
 
 @inline Base.unsafe_convert(::Type{Ptr{T}}, A::AbstractStrideArray) where {T} =
   Base.unsafe_convert(Ptr{T}, pointer(A))
-@inline Base.unsafe_convert(::Type{Ptr{T}}, A::AbstractStrideArray) where {T} =
-  Base.unsafe_convert(Ptr{T}, pointer(A))
 @inline Base.elsize(::AbstractStrideArray{T}) where {T} = sizeof(T)
 
 @inline ArrayInterface.size(A::AbstractPtrStrideArray) = getfield(A, :sizes)
