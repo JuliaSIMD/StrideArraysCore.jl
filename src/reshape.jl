@@ -10,7 +10,6 @@ end
   PtrArray(pointer(A), dims)
 end
 
-if !(StaticInt <: Base.Integer)
 @inline function Base.reshape(A::PtrArray{T,N,R,S,NTuple{N,Nothing}}, dims::Tuple{Vararg{Base.Integer}}) where {T,N,R,S}
   PtrArray(pointer(A), dims)
 end
@@ -23,8 +22,6 @@ end
 end
 @inline function Base.reshape(A::PtrArray{T,N,R,S,NTuple{N,Nothing}}, dims::Tuple{Base.Integer,Vararg{Base.Integer}}) where {T,N,R,S}
   PtrArray(pointer(A), dims)
-end
-
 end
 
 @inline function Base.reshape(A::PtrArray{T,N,R,S,NTuple{N,Nothing}}, dims::Tuple{Vararg{Int}}) where {T,N,R,S}
@@ -48,11 +45,9 @@ end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Integer,Integer,Vararg{Integer}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
 end
-if !(StaticInt <: Integer)
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Vararg{Base.Integer}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Base.Integer,Vararg{Base.Integer}})
   StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
-end
 end
