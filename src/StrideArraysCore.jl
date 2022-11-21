@@ -26,7 +26,8 @@ using LayoutPointers:
   bytestrides,
   zstridedpointer,
   val_dense_dims,
-  val_stride_rank
+  val_stride_rank,
+  zero_offsets
 using CloseOpenIntervals
 
 using ManualMemory: preserve_buffer, offsetsize, MemoryBuffer
@@ -34,6 +35,11 @@ using ManualMemory: preserve_buffer, offsetsize, MemoryBuffer
 using SIMDTypes: NativeTypes, Bit
 
 export PtrArray, StrideArray, StaticInt, static
+
+@static if VERSION < v"1.7"
+  struct Returns{T}; x::T; end
+  (r::Returns)(args...) = r.x
+end
 
 @generated static_sizeof(::Type{T}) where {T} =
   :(StaticInt{$(Base.allocatedinline(T) ? sizeof(T) : sizeof(Int))}())
