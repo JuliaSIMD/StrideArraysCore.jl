@@ -300,7 +300,11 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                 @test view(B0, :, 4:-1:1) == view(B1, :, 4:-1:1) == B1[:, 4:-1:1]
                 @test view(B0, :, 1:2:4) == view(B1, :, 1:2:4) == B1[:,1:2:4]
                 @test view(B1, :, 4:-1:1) === B1[:, 4:-1:1]
-                @test view(B1, :, 1:2:4) === B1[:, 1:2:4]
+                @test view(B1, 2, 1:2:4) === B1[2, 1:2:4]
+                @test view(B0, 2, 4:-1:1) == view(B1, 2, 4:-1:1) == B1[2, 4:-1:1]
+                @test view(B0, 2, 1:2:4) == view(B1, 2, 1:2:4) == B1[2,1:2:4]
+                @test view(B1, 2, 4:-1:1) === B1[2, 4:-1:1]
+                @test view(B1, 2, 1:2:4) === B1[2, 1:2:4]
                 A = StrideArray{Float64}(undef, (100, 100)) .= rand.()
                 vA = view(A, 3:40, 2:50)
                 @test vA === A[3:40, 2:50]
