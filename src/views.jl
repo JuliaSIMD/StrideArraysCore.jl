@@ -19,20 +19,22 @@ function view_quote(
   q = Expr(:block, Expr(:meta,:inline), :(sz = $getfield(A,:sizes)), :(sx = $getfield(A, :strides)))
   zero_offsets || push!(q.args, :(o = $getfield(A,:offsets)))
   # stride rank of (2, 3, 1) means we iter j = (3, 1, 2)
-  p_expr = :(p = $getfield(A,:ptr))
+  p_expr = :($getfield(A,:ptr))
   sz_expr = Expr(:tuple)
   so_expr = Expr(:tuple)
   r_perm = Int[]#Expr(:tuple)
   i_off = prev_stride = :null
   n = N
   i_off_n_sym::Union{Nothing,Symbol} = nothing
+  X_p0 = nothing
   while true
     j = findfirst(==(n), R)::Int
     I_n = I[j]
     s_n = Symbol(:s_,n)
     push!(q.args, Expr(:(=), s_n, Expr(:call, getfield, :sz, j)))
     x_n = Symbol(:x_,n)
-    x_nothing = X.parameters[j] === Nothing
+    X_j = X.parameters[j]
+    x_nothing = X_j === Nothing
     x_nothing || push!(q.args, Expr(:(=), x_n, Expr(:call, getfield, :sx, j)))
     o_n = Symbol(:o_,n)
     if zero_offsets
@@ -42,8 +44,7 @@ function view_quote(
     end
     # scale i_off if not null
     if i_off ≢ :null
-      X_n = X.parameters[j]
-      if X_n === Nothing
+      if X_p0 === Nothing
         # scale i_off by current-dim size
         i_off_scaled = Symbol(i_off, :_scaled)
         push!(q.args, Expr(:(=), i_off_scaled, Expr(:call, *, i_off, s_n)))
@@ -114,6 +115,7 @@ function view_quote(
     n == 1 && break
     prev_stride = x_n
     n -= 1
+    X_p0 = X_j
   end
   # build strides going forward
   sx_expr = Expr(:tuple)
