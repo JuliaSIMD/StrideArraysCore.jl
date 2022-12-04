@@ -50,6 +50,17 @@ include("views.jl")
 include("reshape.jl")
 include("adjoints.jl")
 
+if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
+  dont_limit = Returns(true)
+  for f in (
+    _strides,
+  )
+    for m in methods(f)
+      m.recursion_relation = dont_limit
+    end
+  end
+end
+
 function __init__()
   ccall(:jl_generating_output, Cint, ()) == 1 && return nothing
   if Base.JLOptions().check_bounds == 1
