@@ -213,7 +213,7 @@ function gc_preserve_call(ex, skip = 0)
   q = Expr(:block)
   call = Expr(:call, esc(ex.args[1]))
   gcp = Expr(:gc_preserve, call)
-  if length(ex.args) >= 2 && ex.args[2].head === :parameters
+  if length(ex.args) >= 2 && Meta.isexpr(ex.args[2], :parameters)
     params = ex.args[2]
     deleteat!(ex.args, 2)
     for i = eachindex(params.args)
