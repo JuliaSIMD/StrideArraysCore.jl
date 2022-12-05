@@ -265,6 +265,9 @@ end
 @inline Base.view(A::AbstractPtrArray, ::Colon) = vec(A)
 @inline zview(A::AbstractPtrArray, ::Colon) = vec(A)
 
+@inline Base.view(A::AbstractPtrArray{<:Any,N}, ::Vararg{Colon,N}) where {N} = A
+@inline zview(A::AbstractPtrArray{<:Any,N}, ::Vararg{Colon,N}) where {N} = A
+
 @inline Base.view(A::AbstractPtrVector, ::Colon) = A
 @inline zview(A::AbstractPtrVector, ::Colon) = A
 

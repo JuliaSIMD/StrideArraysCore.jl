@@ -193,6 +193,12 @@ end
 ) where {K}
   StrideArray(view(PtrArray(A), i...), preserve_buffer(A))
 end
+@inline function Base.view(
+  A::AbstractStrideArray{<:Any,K},
+  ::Vararg{Colon,K},
+) where {K}
+  A
+end
 
 @inline function zview(
   A::AbstractStrideArray,
