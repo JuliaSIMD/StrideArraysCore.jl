@@ -1,4 +1,5 @@
 using StrideArraysCore, ThreadingUtilities, Aqua
+using VectorizationBase: relu
 # using InteractiveUtils
 using Test
 
@@ -24,6 +25,51 @@ function cartesianindexsum(A)
         s
 end
 allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
+@noinline function conv!(f::F, _C, _A, _K, _b) where {F}
+        C = StrideArraysCore.LayoutPointers.zero_offsets(_C)
+        A = StrideArraysCore.LayoutPointers.zero_offsets(_A)
+        K = StrideArraysCore.LayoutPointers.zero_offsets(_K)
+        b = StrideArraysCore.LayoutPointers.zero_offsets(_b)
+
+        for j₁ ∈ axes(C, 1), j₂ ∈ axes(C, 2), o ∈ axes(K, 4)
+                s = zero(eltype(C))
+                for k₁ ∈ axes(K, 1), k₂ ∈ axes(K, 2), i ∈ axes(K, 3)
+                        s += A[j₁+k₁, j₂+k₂, i] * K[k₁, k₂, i, o]
+                end
+                C[j₁, j₂, o] = f(s + b[o])
+        end
+
+        return C
+end
+
+function conv_group!(f::F, C, A, K, b, range) where {F}
+        conv!(
+                f,
+                view(C, :, :, range),
+                view(A, :, :, range),
+                view(K, :, :, :, range),
+                view(b, range),
+        )
+        return C
+end
+randn_stridearray(size...) = StrideArray(randn(Float32, size...), static.(size))
+
+@noinline function conv_grouped!(f::F, C, A, K, b) where {F}
+        conv_group!(f, C, A, K, b, static(1 + 0 * 4):static(1 * 4))
+        conv_group!(f, C, A, K, b, static(1 + 1 * 4):static(2 * 4))
+        conv_group!(f, C, A, K, b, static(1 + 2 * 4):static(3 * 4))
+        conv_group!(f, C, A, K, b, static(1 + 3 * 4):static(4 * 4))
+        conv_group!(f, C, A, K, b, static(1 + 4 * 4):static(5 * 4))
+        conv_group!(f, C, A, K, b, static(1 + 5 * 4):static(6 * 4))
+        conv_group!(f, C, A, K, b, static(1 + 6 * 4):static(7 * 4))
+        conv_group!(f, C, A, K, b, static(1 + 7 * 4):static(8 * 4))
+        return C
+end
+
+@inline function unpad(A::AbstractArray{<:Any,3})
+
+        return view(A, static(2):static(9), static(2):static(9), :)
+end
 
 @testset "StrideArraysCore.jl" begin
 
@@ -77,7 +123,7 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
 
                         # @code_llvm closeopensum(A)
                         @test closeopensumfastmath(C) == closeopensumfastmath(A)
-                        @test foldl(+,C) == foldl(+,A)
+                        @test foldl(+, C) == foldl(+, A)
                         # @test sum(C) == sum(A)
                         @test closeopensum(C) ≈ closeopensumfastmath(C) ≈ sum(C)
                         @test A == B
@@ -182,8 +228,8 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                         @test StrideArraysCore.ArrayInterface.known_last(ax2) ===
                               StrideArraysCore.ArrayInterface.known_length(1:1)
                 end
-                W = rand(2, 3, 4);
-                X = PtrArray(W);
+                W = rand(2, 3, 4)
+                X = PtrArray(W)
                 @test @inferred(StrideArraysCore.ArrayInterface.known_size(X)) ===
                       (nothing, nothing, nothing)
                 GC.@preserve W begin
@@ -298,11 +344,11 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                 B0 = reshape(collect(1:12), 3, 4)
                 B1 = StrideArray(B0)
                 @test view(B0, :, 4:-1:1) == view(B1, :, 4:-1:1) == B1[:, 4:-1:1]
-                @test view(B0, :, 1:2:4) == view(B1, :, 1:2:4) == B1[:,1:2:4]
+                @test view(B0, :, 1:2:4) == view(B1, :, 1:2:4) == B1[:, 1:2:4]
                 @test view(B1, :, 4:-1:1) === B1[:, 4:-1:1]
                 @test view(B1, 2, 1:2:4) === B1[2, 1:2:4]
                 @test view(B0, 2, 4:-1:1) == view(B1, 2, 4:-1:1) == B1[2, 4:-1:1]
-                @test view(B0, 2, 1:2:4) == view(B1, 2, 1:2:4) == B1[2,1:2:4]
+                @test view(B0, 2, 1:2:4) == view(B1, 2, 1:2:4) == B1[2, 1:2:4]
                 @test view(B1, 2, 4:-1:1) === B1[2, 4:-1:1]
                 @test view(B1, 2, 1:2:4) === B1[2, 1:2:4]
                 A = StrideArray{Float64}(undef, (100, 100)) .= rand.()
@@ -327,9 +373,9 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
         @testset "BitPtrArray" begin
                 b = collect(1:10) .> 5
                 @test sprint((io, t) -> show(io, t), StrideArray(b)) == """
-            Bool[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]"""
+                          Bool[0, 0, 0, 0, 0, 1, 1, 1, 1, 1]"""
                 @test sprint((io, t) -> show(io, t), StrideArray(b)') == """
-            Bool[0 0 0 0 0 1 1 1 1 1]"""
+                          Bool[0 0 0 0 0 1 1 1 1 1]"""
         end
         @testset "PtrArray0" begin
                 x = collect(0:3)
@@ -340,7 +386,34 @@ allocated_cartesianindexsum(x) = @allocated cartesianindexsum(x)
                         end
                 end
         end
-        # @testset "reinterpret" begin
 
-        # end
+        @testset "conv" begin
+
+
+                A = randn_stridearray(10, 10, 32)
+                C = randn_stridearray(10, 10, 32)
+                K = randn_stridearray(3, 3, 4, 32)
+                b = randn_stridearray(32)
+                Ca = Array(C)
+                @test Ca == C
+                @test unpad(Ca) == unpad(C)
+                conv_grouped!(relu, unpad(C), A, K, b)
+                #Ca = Array(C);
+                Aa = Array(A)
+                Ka = Array(K)
+                ba = Array(b)
+                @test Aa == A
+                @test Ka == K
+                @test ba == b
+                for i = 1:3
+                        @test axes(A, i) == axes(Aa, i)
+                        @test axes(K, i) == axes(Ka, i)
+                        @test axes(C, i) == axes(Ca, i)
+                end
+                @test axes(C, 4) == axes(Ca, 4)
+                @test axes(b, 1) == axes(ba, 1)
+                conv_grouped!(relu, unpad(Ca), Aa, Ka, ba)
+                @test C ≈ Ca
+
+        end
 end
