@@ -22,7 +22,7 @@ end
 struct StrideReset{T}
   x::T
 end
-
+@inline Base.:(*)(x::StrideReset, y::Union{Integer,StaticInt}) = x.x * y
 # sizes M x N
 # strides nothing x nothing -> static(1) x M
 # strides L x nothing -> L x L*M
@@ -809,7 +809,7 @@ end
     )
   end
   sp = reinterpret(Tnew, stridedpointer(A))
-  PtrArray(sp, sz)
+  PtrArray(sp, sz, val_dense_dims(A))
 end
 
 @generated function Base.reinterpret(
