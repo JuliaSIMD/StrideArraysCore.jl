@@ -1,6 +1,7 @@
 module StrideArraysCore
 
-using LayoutPointers, ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
+using LayoutPointers,
+  ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
 using Static: StaticInt, StaticBool, True, False, Zero, One
 const Integer = Union{StaticInt,Base.BitInteger}
 
@@ -37,7 +38,9 @@ using SIMDTypes: NativeTypes, Bit
 export PtrArray, StrideArray, StaticInt, static
 
 @static if VERSION < v"1.7"
-  struct Returns{T}; x::T; end
+  struct Returns{T}
+    x::T
+  end
   (r::Returns)(args...) = r.x
 end
 
@@ -52,9 +55,7 @@ include("adjoints.jl")
 
 if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
   dont_limit = Returns(true)
-  for f in (
-    _strides,
-  )
+  for f in (_strides,)
     for m in methods(f)
       m.recursion_relation = dont_limit
     end

@@ -26,8 +26,10 @@ end
     bc, bc
   end
 end
-@inline array_object_and_preserve(::ArrayInterface.CPUPointer, A::AbstractArray) =
-  (PtrArray(A), preserve_buffer(A))
+@inline array_object_and_preserve(
+  ::ArrayInterface.CPUPointer,
+  A::AbstractArray
+) = (PtrArray(A), preserve_buffer(A))
 @inline array_object_and_preserve(_, A::AbstractArray) = _object_and_preserve(A)
 
 @inline function object_and_preserve(t::Tuple{T}) where {T}

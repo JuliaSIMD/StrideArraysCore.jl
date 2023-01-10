@@ -1,12 +1,12 @@
 @inline function Base.view(
   A::AbstractPtrArray{T,N,R,S,X,O,P},
-  i::Vararg{Union{Integer,AbstractRange,Colon},N},
+  i::Vararg{Union{Integer,AbstractRange,Colon},N}
 ) where {T,N,R,S,X,O,P}
   PtrArray(SubArray(A, Base.to_indices(A, i)))
 end
 @inline function zview(
   A::AbstractPtrArray{T,N,R,S,X,O,P},
-  i::Vararg{Union{Integer,AbstractRange,Colon},N},
+  i::Vararg{Union{Integer,AbstractRange,Colon},N}
 ) where {T,N,R,S,X,O,P}
   zero_offsets(view(A, i...))
 end
@@ -22,6 +22,7 @@ end
 
 """
     rank_to_sortperm(::NTuple{N,Int}) -> NTuple{N,Int}
+
 Returns the `sortperm` of the stride ranks.
 """
 function rank_to_sortperm(R::NTuple{N,Int}) where {N}
