@@ -1,4 +1,8 @@
 module StrideArraysCore
+if isdefined(Base, :Experimental) &&
+   isdefined(Base.Experimental, Symbol("@max_methods"))
+  @eval Base.Experimental.@max_methods 1
+end
 
 using LayoutPointers,
   ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
