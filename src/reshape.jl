@@ -58,32 +58,32 @@ end
 end
 
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Int})
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Vararg{Int}})
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Int,Vararg{Int}})
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Int,Int,Vararg{Int}})
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Integer})
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(
   A::StrideArray,
   dims::Tuple{Integer,Integer,Vararg{Integer}}
 )
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(A::StrideArray, dims::Tuple{Vararg{Base.Integer}})
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end
 @inline function Base.reshape(
   A::StrideArray,
   dims::Tuple{Base.Integer,Vararg{Base.Integer}}
 )
-  StrideArray(reshape(PtrArray(A), dims), preserve_buffer(A))
+  StrideArray(PtrArray(pointer(A), dims), preserve_buffer(A))
 end

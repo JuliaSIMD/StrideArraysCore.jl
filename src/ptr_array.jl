@@ -22,6 +22,21 @@ struct StrideReset{T}
   x::T
 end
 @inline Base.:(*)(x::StrideReset, y::Union{Integer,StaticInt}) = x.x * y
+@inline __scale(x::StrideReset, y::Union{Integer,StaticInt}) =
+  StrideReset(x.x * y)
+@inline __scale(x::Union{Integer,StaticInt}, y::Union{Integer,StaticInt}) =
+  x * y
+# three arg calcs div((x * y), z)
+@inline __scale(
+  x::StrideReset,
+  y::Union{Integer,StaticInt},
+  z::Union{Integer,StaticInt}
+) = StrideReset(div(x.x * y, z))
+@inline __scale(
+  x::Union{Integer,StaticInt},
+  y::Union{Integer,StaticInt},
+  z::Union{Integer,StaticInt}
+) = div(x * y, z)
 # sizes M x N
 # strides nothing x nothing -> static(1) x M
 # strides L x nothing -> L x L*M
@@ -105,6 +120,12 @@ struct AbstractPtrArray{T,N,R,S,X,O,P} <: AbstractPtrStrideArray{T,N,R,S,X,O}
   sizes::S
   strides::X
   offsets::O
+  # function AbstractPtrArray{T,N,R,S,X,O,P}(ptr, sizes, strides, offsets) where {
+  #   T,N,R,S,X,O,P
+  #   }
+  #   @assert T !== Bit
+  #   new{T,N,R,S,X,O,P}(ptr, sizes, strides, offsets)
+  # end
 end
 const PtrArray{T,N,R,S,X,O} = AbstractPtrArray{T,N,R,S,X,O,T}
 const PtrArray0{T,N,R,S,X} = AbstractPtrArray{T,N,R,S,X,NTuple{N,Zero},T}
@@ -204,7 +225,7 @@ end
 ) where {T,N,S<:Tuple{Vararg{Integer,N}},R}
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(1)), Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 @inline function PtrArray0(
   p::Ptr{T},
@@ -213,7 +234,7 @@ end
 ) where {T,N,S<:Tuple{Vararg{Integer,N}},R}
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(0)), Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{0}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 @inline function PtrArray(
   p::Ptr{T},
@@ -222,7 +243,7 @@ end
   ::Val{R}
 ) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},R}
   o = ntuple(Returns(static(1)), Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 @inline function PtrArray0(
   p::Ptr{T},
@@ -231,7 +252,7 @@ end
   ::Val{R}
 ) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}},R}
   o = ntuple(Returns(static(0)), Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{0}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 @inline function PtrArray(
   p::Ptr{T},
@@ -240,7 +261,7 @@ end
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(1)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{1}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 @inline function PtrArray0(
   p::Ptr{T},
@@ -249,7 +270,7 @@ end
   sx = ntuple(Returns(nothing), Val(N))
   o = ntuple(Returns(static(0)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,NTuple{N,Nothing},NTuple{N,StaticInt{0}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 @inline function PtrArray(
   p::Ptr{T},
@@ -258,7 +279,7 @@ end
 ) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}}}
   o = ntuple(Returns(static(1)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{1}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 @inline function PtrArray0(
   p::Ptr{T},
@@ -267,7 +288,7 @@ end
 ) where {T,N,S<:Tuple{Vararg{Integer,N}},X<:Tuple{Vararg{Any,N}}}
   o = ntuple(Returns(static(0)), Val(N))
   R = ntuple(identity, Val(N))
-  PtrArray{T,N,R,S,X,NTuple{N,StaticInt{0}}}(p, sz, sx, o)
+  AbstractPtrArray(p, sz, sx, o, Val(R))
 end
 
 @generated function _nondense_strides(
@@ -657,7 +678,7 @@ rank2sortperm(R) =
 # end
 @generated function _offset_ptr(
   ptr::AbstractStridedPointer{T,N,C,B,R},
-  i::Tuple{Vararg{Union{Integer,StaticInt},NI}}
+  i::Tuple{Vararg{Union{Integer,StaticInt,AbstractRange,Colon},NI}}
 ) where {T,N,C,B,R,NI}
   ptr_expr = :(pointer(ptr))
   T === Bit && (ptr_expr = :(Ptr{UInt8}($ptr_expr)))
@@ -670,11 +691,17 @@ rank2sortperm(R) =
         )
       )
     end
+    i.parameters[1] === Colon &&
+      return Expr(:block, Expr(:meta, :inline), ptr_expr)
+    iexpr = first(i)
+    if i.parameters[1] <: AbstractRangeAbstr
+      iexpr = :(first($iexpr))
+    end
     # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
     return Expr(
       :block,
       Expr(:meta, :inline),
-      :($ptr_expr + (first(i) - (ptr).si.offsets[1]) * $(static_sizeof(T)))
+      :($ptr_expr + ($iexpr - (ptr).si.offsets[1]) * $(static_sizeof(T)))
     )
   end
   sp = rank2sortperm(R)
@@ -687,9 +714,14 @@ rank2sortperm(R) =
   )
   for n ∈ 1:N
     j = findfirst(==(n), sp)::Int
-    index = Expr(:call, getfield, :i, j, false)
-    offst = Expr(:call, getfield, :o, j, false)
-    strid = Expr(:call, getfield, :x, j, false)
+    ityp = i.parameters[j]
+    ityp === Colon && continue
+    index = Expr(:call, getfield, :i, j)
+    if ityp <: AbstractRange
+      index = :(first($index))
+    end
+    offst = Expr(:call, getfield, :o, j)
+    strid = Expr(:call, getfield, :x, j)
     if T ≢ Bit
       push!(q.args, :(p += ($index - $offst) * $strid))
     else
@@ -838,17 +870,14 @@ end
   ::Type{Tnew},
   A::PtrArray{Told,N}
 ) where {Tnew,Told,N}
-  sz = let szt_old = static_sizeof(Told), szt_new = static_sizeof(Tnew)
-    map(
-      _scale,
-      contiguous_axis_indicator(A),
-      size(A),
-      ntuple(Returns(szt_old), Val(N)),
-      ntuple(Returns(szt_new), Val(N))
-    )
-  end
+  szt_old = static_sizeof(Told)
+  szt_new = static_sizeof(Tnew)
+  sz_old = size(A)
+  sz1_new =
+    _scale(first(contiguous_axis_indicator(A)), first(sz_old), szt_old, szt_new)
+  sz_new = (sz1_new, Base.tail(sz_old)...)
   sp = reinterpret(Tnew, stridedpointer(A))
-  PtrArray(sp, sz, val_dense_dims(A))
+  PtrArray(sp, sz_new, val_dense_dims(A))
 end
 
 @generated function Base.reinterpret(
@@ -889,8 +918,7 @@ end
       sx_n = Expr(:call, getfield, :x, n)
       of_n = Expr(:call, getfield, :o, n)
       if (sz_old != sz_new) && (X.parameters[n] ≢ Nothing)
-        sx_n =
-          Expr(:call, ÷, Expr(:call, *, sx_n, static(sz_old)), static(sz_new))
+        sx_n = Expr(:call, __scale, sx_n, static(sz_old), static(sz_new))
       end
       if n ≠ C
         push!(size_expr.args, sz_n)
@@ -921,13 +949,5 @@ end
     PtrArray(Ptr{$Tnew}(p), $size_expr, $stride_expr, $offs_expr, Val{$Rnew}())
   end
 end
-@inline Base.reinterpret(::Type{T}, A::AbstractStrideArray) where {T} =
-  StrideArray(reinterpret(T, PtrArray(A)), preserve_buffer(A))
-@inline Base.reinterpret(
-  ::typeof(reshape),
-  ::Type{T},
-  A::AbstractStrideArray
-) where {T} =
-  StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
 
 Base.LinearIndices(x::AbstractStrideVector) = axes(x, static(1))

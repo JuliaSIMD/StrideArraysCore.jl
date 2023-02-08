@@ -254,7 +254,7 @@ end
 end
 
 @inline function Base.view(
-  A::AbstractStrideArray,
+  A::AbstractStrideArrayImpl,
   i::Vararg{Union{Integer,AbstractRange,Colon},K}
 ) where {K}
   StrideArray(view(PtrArray(A), i...), preserve_buffer(A))
@@ -355,3 +355,12 @@ end
     :(IndexCartesian())
   end
 end
+
+@inline Base.reinterpret(::Type{T}, A::AbstractStrideArrayImpl) where {T} =
+  StrideArray(reinterpret(T, PtrArray(A)), preserve_buffer(A))
+@inline Base.reinterpret(
+  ::typeof(reshape),
+  ::Type{T},
+  A::AbstractStrideArrayImpl
+) where {T} =
+  StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
