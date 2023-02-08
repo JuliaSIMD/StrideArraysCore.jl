@@ -15,14 +15,14 @@ end
   i::AbstractUnitRange
 ) where {T}
   sx = stride(A, static(1))
-  p = pointer(A) + first(i) * sizeof(T) * sx
+  p = pointer(A) + (first(i) - first(offsets(A))) * sizeof(T) * sx
   PtrArray(p, (length(i),), (sx,))
 end
 
-@inline function Base.view(
+@inline function _view(
   B::BitPtrArray{N},
-  i::Vararg{Union{Integer,AbstractRange,Colon},N}
-) where {N}
+  i::Vararg{Union{Integer,AbstractRange,Colon},M}
+) where {N,M}
   A = SubArray(B, Base.to_indices(B, i))
   p = _offset_ptr(stridedpointer(B), i)
   sz = size(A)
@@ -34,20 +34,13 @@ end
   B::BitPtrArray{N},
   i::Vararg{Union{Integer,AbstractRange,Colon},M}
 ) where {N,M}
-  A = SubArray(B, i...)
-  # TODO: handle offsetting correctly
-  # `SubArray` is off by a factor 8 too large
-  # rather than calculate the correct pointer offset..a fac
-  p8off = LayoutPointers.memory_reference(A)[1]
-  pb = pointer(B)
-  off8 = UInt(p8off - pb)
-  off = off8 >>> 3
-  @assert off8 == (off << 3)
-  p = pb + off
-  sz = size(A)
-  sx = _sparse_strides(dense_dims(A), strides(A))
-  R = map(Int, stride_rank(A))
-  PtrArray(p, sz, sx, offsets(A), _compact_rank(Val(R)))
+  _view(B, i...)
+end
+@inline function Base.view(
+  B::BitPtrArray{N},
+  i::Vararg{Union{Integer,AbstractRange,Colon},N}
+) where {N}
+  _view(B, i...)
 end
 @inline function zview(
   A::AbstractPtrArray{T,N,R,S,X,O,P},

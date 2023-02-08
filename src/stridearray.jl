@@ -152,7 +152,12 @@ end
 @inline function ArrayInterface.strides(
   A::StaticStrideArray{<:Any,N,R}
 ) where {N,R}
-  _strides(size(A), ntuple(Returns(nothing), Val{N}()), Val{R}())
+  _strides_entry(
+    size(A),
+    ntuple(Returns(nothing), Val{N}()),
+    Val{R}(),
+    Val(false)
+  )
 end
 @inline ArrayInterface.offsets(
   ::StaticStrideArray{T,N,R,S,X,O}

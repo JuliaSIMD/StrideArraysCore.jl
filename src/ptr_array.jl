@@ -67,21 +67,22 @@ end
   (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
 end
 
-@inline function _strides(
+# entry point
+@inline function _strides_nobit(
   sizes::Tuple{Integer,Vararg{Integer,N}},
   strides::Tuple{Integer,Vararg{Any,N}}
 ) where {N}
   prev = first(strides)
   (prev, _strides(Base.front(sizes), Base.tail(strides), prev)...)
 end
-@inline function _strides(
+@inline function _strides_nobit(
   sizes::Tuple{Integer,Vararg{Integer,N}},
   strides::Tuple{StrideReset{T},Vararg{Any,N}}
 ) where {N,T}
   next = getfield(first(strides), :x)
-  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
+  (next, _strides(Base.front(sizes), Base.tail(strides), next)...)
 end
-@inline function _strides(
+@inline function _strides_nobit(
   sizes::Tuple{Integer,Vararg{Integer,N}},
   strides::Tuple{Nothing,Vararg{Any,N}}
 ) where {N}
@@ -89,9 +90,88 @@ end
   (prev, _strides(Base.front(sizes), Base.tail(strides), prev)...)
 end
 
-@inline function _strides(sizes, strides, ::Val{R}) where {R}
+# entry point, guaranteed to have N > 0
+@inline function _strides_bit(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{Integer,Vararg{Any,N}}
+) where {N}
+  prev = (first(strides) + static(7)) & static(-8)
+  (prev, _strides(Base.front(sizes), Base.tail(strides), prev)...)
+end
+@inline function _strides_bit(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{StrideReset{T},Vararg{Any,N}}
+) where {N,T}
+  next = (getfield(first(strides), :x) + static(7)) & static(-8)
+  (next, _strides(Base.front(sizes), Base.tail(strides), next)...)
+end
+@inline function __strides_bit(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{Integer,Vararg{Any,N}}
+) where {N}
+  next = (first(strides) + static(7)) & static(-8)
+  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
+end
+@inline function __strides_bit(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{Nothing,Vararg{Any,N}}
+) where {N}
+  next = (first(sizes) + static(7)) & static(-8)
+  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
+end
+@inline function __strides_bit(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{StrideReset{T},Vararg{Any,N}}
+) where {N,T}
+  next = (getfield(first(strides), :x) + static(7)) & static(-8)
+  (next, _strides(Base.tail(sizes), Base.tail(strides), next)...)
+end
+@inline function _strides_bit(
+  sizes::Tuple{Integer,Vararg{Integer,N}},
+  strides::Tuple{Nothing,Vararg{Any,N}}
+) where {N}
+  (static(1), __strides_bit(Base.front(sizes), Base.tail(strides))...)
+end
+
+# 4th arg is bit
+@inline function _strides_entry(
+  sizes,
+  strides,
+  ::Val{R},
+  ::Val{false}
+) where {R}
   VR = Val{R}()
-  sx = _strides(invpermtuple(sizes, VR), invpermtuple(strides, VR))
+  sx = _strides_nobit(invpermtuple(sizes, VR), invpermtuple(strides, VR))
+  permtuple(sx, VR)
+end
+@inline _strides_entry(::Tuple{}, ::Tuple{}, ::Val{()}, ::Val{true}) = ()
+@inline function _strides_entry(
+  ::Tuple{S},
+  ::Tuple{Nothing},
+  ::Val{R},
+  ::Val{true}
+) where {S,R}
+  (static(1),)
+end
+@inline function _strides_entry(
+  ::Tuple{S},
+  strides::Tuple{Integer},
+  ::Val{R},
+  ::Val{true}
+) where {S,R}
+  strides
+end
+@inline function _strides_entry(
+  ::Tuple{S},
+  strides::Tuple{StrideReset{T}},
+  ::Val{R},
+  ::Val{true}
+) where {S,T,R}
+  (getfield(only(strides), :x),)
+end
+@inline function _strides_entry(sizes, strides, ::Val{R}, ::Val{true}) where {R}
+  VR = Val{R}()
+  sx = _strides_bit(invpermtuple(sizes, VR), invpermtuple(strides, VR))
   permtuple(sx, VR)
 end
 
@@ -151,6 +231,12 @@ const BitPtrVector0{R,S,X} = AbstractPtrArray{Bool,1,R,S,X,NTuple{1,Zero},Bit}
 const BitPtrVector1{R,S,X} = AbstractPtrArray{Bool,1,R,S,X,NTuple{1,One},Bit}
 const BitPtrMatrix0{R,S,X} = AbstractPtrArray{Bool,2,R,S,X,NTuple{2,Zero},Bit}
 const BitPtrMatrix1{R,S,X} = AbstractPtrArray{Bool,2,R,S,X,NTuple{2,One},Bit}
+
+@inline valisbit(::AbstractPtrArray{<:Any,<:Any,<:Any,<:Any,<:Any,<:Any,Bit}) =
+  Val(true)
+@inline valisbit(
+  ::AbstractPtrArray{<:Any,<:Any,<:Any,<:Any,<:Any,<:Any,<:Any}
+) = Val(false)
 
 # function PtrArray(
 #   ptr::Ptr{T}, sizes::S, strides::X, offsets::O, ::Val{R}
@@ -402,7 +488,7 @@ end
 @inline function ArrayInterface.strides(
   A::AbstractPtrStrideArray{<:Any,<:Any,R}
 ) where {R}
-  _strides(size(A), getfield(A, :strides), Val{R}())
+  _strides_entry(size(A), getfield(A, :strides), Val{R}(), valisbit(A))
 end
 ArrayInterface.device(::AbstractStrideArray) = ArrayInterface.CPUPointer()
 
@@ -656,32 +742,11 @@ rank2sortperm(R) =
     sum(map(≥(r), R))
   end
 
-# @generated function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
-#   if N ≠ NI
-#     if (N > NI) & (NI ≠ 1)
-#       throw(ArgumentError("If the dimension of the array exceeds the dimension of the index, then the index should be linear/one dimensional."))
-#     end
-#     # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
-#     return Expr(:block, Expr(:meta,:inline), :(pointer(ptr) + (first(i)-1)*$(static_sizeof(T))))
-#   end
-#   sp = rank2sortperm(R)
-#   q = Expr(:block, Expr(:meta,:inline), :(p = pointer(ptr)), :(o = LayoutPointers.offsets(ptr)), :(x = strides(ptr)))
-#   gf = GlobalRef(Core,:getfield)
-#   for n ∈ 1:N
-#     j = findfirst(==(n),sp)::Int
-#     index = Expr(:call, gf, :i, j, false)
-#     offst = Expr(:call, gf, :o, j, false)
-#     strid = Expr(:call, gf, :x, j, false)
-#     push!(q.args, :(p += ($index - $offst)*$strid))
-#   end
-#   q
-# end
 @generated function _offset_ptr(
   ptr::AbstractStridedPointer{T,N,C,B,R},
   i::Tuple{Vararg{Union{Integer,StaticInt,AbstractRange,Colon},NI}}
 ) where {T,N,C,B,R,NI}
   ptr_expr = :(pointer(ptr))
-  T === Bit && (ptr_expr = :(Ptr{UInt8}($ptr_expr)))
   N == 0 && return Expr(:block, Expr(:meta, :inline), ptr_expr)
   if N ≠ NI
     if (N > NI) & (NI ≠ 1)
@@ -691,13 +756,13 @@ rank2sortperm(R) =
         )
       )
     end
+    # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
     i.parameters[1] === Colon &&
       return Expr(:block, Expr(:meta, :inline), ptr_expr)
-    iexpr = first(i)
-    if i.parameters[1] <: AbstractRangeAbstr
+    iexpr = :(first(i))
+    if i.parameters[1] <: AbstractRange
       iexpr = :(first($iexpr))
     end
-    # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
     return Expr(
       :block,
       Expr(:meta, :inline),
@@ -728,12 +793,9 @@ rank2sortperm(R) =
       push!(q.args, :(p += (($index - $offst) * $strid) >>> 3))
     end
   end
+  push!(q.args, :(p))
   q
 end
-# @inline _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R,X,NTuple{N,Zero}}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI,X} = __offset_ptr(ptr,i)
-# @inline function _offset_ptr(ptr::AbstractStridedPointer{T,N,C,B,R}, i::Tuple{Vararg{Integer,NI}}) where {T,N,C,B,R,NI}
-#   __offset_ptr(LayoutPointers.center(ptr), i)
-# end
 
 @inline function Base.getindex(
   A::BitPtrArray{N},
@@ -741,12 +803,12 @@ end
 ) where {N}
   C = Int(ArrayInterface.contiguous_axis(A))::Int
   fi = getfield(i, C) - getfield(offsets(A), C)
-  u = pload(_offset_ptr(stridedpointer(A), i))
+  u = pload(Ptr{UInt8}(_offset_ptr(stridedpointer(A), i)))
   (u >>> (fi & 7)) % Bool
 end
 @inline function Base.getindex(A::BitPtrArray, i::Union{Integer,StaticInt})
   j = i - oneunit(i)
-  u = pload(reinterpret(Ptr{UInt8}, pointer(A)) + (j >>> 3))
+  u = pload(Ptr{UInt8}(pointer(A)) + (j >>> 3))
   (u >>> (j & 7)) % Bool
 end
 @inline function Base.setindex!(
@@ -756,7 +818,7 @@ end
 ) where {N}
   C = Int(ArrayInterface.contiguous_axis(A))::Int
   fi = getfield(i, C) - getfield(offsets(A), C)
-  p = _offset_ptr(stridedpointer(A), i)
+  p = Ptr{UInt8}(_offset_ptr(stridedpointer(A), i))
   u = pload(p)
   sh = fi & 7
   u &= ~(0x01 << sh)
