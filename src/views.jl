@@ -42,6 +42,25 @@ end
 ) where {N}
   _view(B, i...)
 end
+
+@inline function _bview_unitrange(A, i)
+  sx = stride(A, static(1))
+  @assert sx === static(1)
+  off = (first(i) - first(offsets(A)))
+  @assert off % 8 == 0
+  p = pointer(A) + (off >>> 3)
+  PtrArray(p, (length(i),), (sx,))
+end
+@inline function Base.view(A::BitPtrArray{N}, i::AbstractUnitRange) where {N}
+  @assert size(A, static(1)) == stride(A, static(2))
+  _bview_unitrange(A, i)
+end
+@inline function Base.view(A::BitPtrArray{1}, i::AbstractUnitRange)
+  _bview_unitrange(A, i)
+end
+@inline Base.view(A::BitPtrArray{1}, ::Colon) = A
+@inline Base.view(A::BitPtrArray{N}, ::Colon) where {N} = A
+
 @inline function zview(
   A::AbstractPtrArray{T,N,R,S,X,O,P},
   i::Vararg{Union{Integer,AbstractRange,Colon},M}

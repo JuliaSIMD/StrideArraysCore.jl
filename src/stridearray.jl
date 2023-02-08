@@ -145,6 +145,7 @@ end
   end
   t
 end
+@inline StrideArray(A::StaticStrideArray) = A
 
 @inline ArrayInterface.size(
   ::StaticStrideArray{<:Any,<:Any,<:Any,S}
