@@ -16,7 +16,7 @@ end
 ) where {T}
   sx = stride(A, static(1))
   p = pointer(A) + (first(i) - first(offsets(A))) * sizeof(T) * sx
-  PtrArray(p, (length(i),), (sx,))
+  PtrArray(p, (static_length(i),), (sx,))
 end
 
 @inline function _view(
@@ -25,7 +25,7 @@ end
 ) where {N,M}
   A = SubArray(B, Base.to_indices(B, i))
   p = _offset_ptr(stridedpointer(B), i)
-  sz = size(A)
+  sz = static_size(A)
   sx = _sparse_strides(dense_dims(A), strides(A))
   R = map(Int, stride_rank(A))
   PtrArray(p, sz, sx, offsets(A), _compact_rank(Val(R)))
@@ -49,10 +49,10 @@ end
   off = (first(i) - first(offsets(A)))
   @assert off % 8 == 0
   p = pointer(A) + (off >>> 3)
-  PtrArray(p, (length(i),), (sx,))
+  PtrArray(p, (static_length(i),), (sx,))
 end
 @inline function Base.view(A::BitPtrArray{N}, i::AbstractUnitRange) where {N}
-  @assert size(A, static(1)) == stride(A, static(2))
+  @assert static_size(A, static(1)) == static_strides(A, static(2))
   _bview_unitrange(A, i)
 end
 @inline function Base.view(A::BitPtrArray{1}, i::AbstractUnitRange)

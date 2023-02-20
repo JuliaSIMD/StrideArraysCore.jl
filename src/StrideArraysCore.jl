@@ -19,7 +19,7 @@ using StaticArrayInterface:
   static_length,
   static_first,
   static_last,
-  axes,
+  static_axes,
   dense_dims,
   stride_rank,
   StrideIndex,

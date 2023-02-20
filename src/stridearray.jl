@@ -103,7 +103,7 @@ end
 ) where {T,N}
   # what is the point of this method? Why not `view(PtrArray(A), ...)`?
   p = pointer(A)
-  sx = _sparse_strides(dense_dims(A), strides(A))
+  sx = _sparse_strides(dense_dims(A), static_strides(A))
   R = map(Int, stride_rank(A))
   B = PtrArray(p, sz, sx, offsets(A), Val(R))
   StrideArray(B, preserve_buffer(A))
@@ -147,14 +147,14 @@ end
 end
 @inline StrideArray(A::StaticStrideArray) = A
 
-@inline ArrayInterface.size(
+@inline ArrayInterface.static_size(
   ::StaticStrideArray{<:Any,<:Any,<:Any,S}
 ) where {S} = to_static_tuple(Val(S))
-@inline function ArrayInterface.strides(
+@inline function ArrayInterface.static_strides(
   A::StaticStrideArray{<:Any,N,R}
 ) where {N,R}
   _strides_entry(
-    size(A),
+    static_size(A),
     ntuple(Returns(nothing), Val{N}()),
     Val{R}(),
     Val(false)
@@ -219,11 +219,11 @@ end
   PtrArray(A)
 @inline maybe_ptr_array(_, A::AbstractArray) = A
 
-@inline ArrayInterface.size(A::AbstractStrideArrayImpl) =
+@inline ArrayInterface.static_size(A::AbstractStrideArrayImpl) =
   getfield(getfield(A, :ptr), :sizes)
 
-@inline ArrayInterface.strides(A::AbstractStrideArrayImpl) =
-  strides(getfield(A, :ptr))
+@inline ArrayInterface.static_strides(A::AbstractStrideArrayImpl) =
+  static_strides(getfield(A, :ptr))
 @inline ArrayInterface.offsets(A::AbstractStrideArrayImpl) =
   offsets(getfield(A, :ptr))
 
@@ -252,11 +252,11 @@ end
   end
 end
 @inline function Base.similar(A::AbstractStrideArray{T}) where {T}
-  StrideArray{T}(undef, size(A))
+  StrideArray{T}(undef, static_size(A))
 end
-@inline Base.similar(A::BitPtrArray) = StrideArray{Bit}(undef, size(A))
+@inline Base.similar(A::BitPtrArray) = StrideArray{Bit}(undef, static_size(A))
 @inline function Base.similar(A::AbstractStrideArray, ::Type{T}) where {T}
-  StrideArray{T}(undef, size(A))
+  StrideArray{T}(undef, static_size(A))
 end
 
 @inline function Base.view(

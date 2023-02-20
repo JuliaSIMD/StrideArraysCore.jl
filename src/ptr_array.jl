@@ -594,13 +594,14 @@ end
 @inline create_axis(::StaticInt{N}, ::One) where {N} = One():StaticInt{N}()
 @inline create_axis(s, o) = CloseOpen(o, s + o)
 
-@inline ArrayInterface.axes(A::AbstractPtrArray) =
+@inline ArrayInterface.static_axes(A::AbstractPtrArray) =
   map(create_axis, static_size(A), offsets(A))
 @inline ArrayInterface.static_size(A::AbstractStrideArray) =
   static_size(PtrArray(A))
-@inline ArrayInterface.axes(A::AbstractStrideArray) = axes(PtrArray(A))
-@inline Base.axes(A::AbstractStrideArray) = axes(A)
-@inline Base.axes(A::AbstractStrideArray, d::StaticInt) = axes(A, d)
+@inline ArrayInterface.static_axes(A::AbstractStrideArray) =
+  static_axes(PtrArray(A))
+@inline Base.axes(A::AbstractStrideArray) = static_axes(A)
+@inline Base.axes(A::AbstractStrideArray, d::StaticInt) = static_axes(A, d)
 
 @generated function ArrayInterface.axes_types(
   ::Type{<:AbstractStrideArray{T,N,R,S,X,O}}
@@ -673,7 +674,7 @@ end
     return One():One()
   end
 end
-@inline Base.axes(A::AbstractStrideArray, i::Integer) = axes(A, i)
+@inline Base.axes(A::AbstractStrideArray, i::Integer) = static_axes(A, i)
 
 @inline function ArrayInterface.static_size(A::AbstractStrideVector, i::Int)
   d = Int(length(A))
@@ -1022,4 +1023,4 @@ end
   end
 end
 
-Base.LinearIndices(x::AbstractStrideVector) = axes(x, static(1))
+Base.LinearIndices(x::AbstractStrideVector) = static_axes(x, static(1))
