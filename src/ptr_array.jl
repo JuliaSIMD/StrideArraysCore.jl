@@ -406,7 +406,7 @@ end
   sz::S,
   ::Val{D}
 ) where {T,N,R,O,D,S}
-  sx = _nondense_strides(strides(ptr), Val(true), Val{D}())
+  sx = _nondense_strides(static_strides(ptr), Val(true), Val{D}())
   X = typeof(sx)
   PtrArray{T,N,R,S,X,O}(pointer(ptr), sz, sx, offsets(ptr))
 end
@@ -415,12 +415,15 @@ end
   sz::S,
   ::Val{D}
 ) where {N,R,O,D,S}
-  sx = _nondense_strides(strides(ptr), Val(false), Val{D}())
+  sx = _nondense_strides(static_strides(ptr), Val(false), Val{D}())
   X = typeof(sx)
   BitPtrArray{N,R,S,X,O}(pointer(ptr), sz, sx, offsets(ptr))
 end
-@inline PtrArray(A::BitArray{N}) where {N} =
-  PtrArray(stridedpointer(A), size(A), Val(ntuple(Returns(true), Val(N))))
+@inline PtrArray(A::BitArray{N}) where {N} = PtrArray(
+  stridedpointer(A),
+  static_size(A),
+  Val(ntuple(Returns(true), Val(N)))
+)
 
 @inline _sparse_strides(::Tuple{}, ::Tuple{}) = ()
 @inline function _sparse_strides(
@@ -472,8 +475,8 @@ end
 
 @inline function PtrArray(A::AbstractArray{T,N}) where {T,N}
   p = LayoutPointers.memory_reference(A)[1]
-  sz = size(A)
-  sx = _sparse_strides(dense_dims(A), strides(A))
+  sz = static_size(A)
+  sx = _sparse_strides(dense_dims(A), static_strides(A))
   R = map(Int, stride_rank(A))
   PtrArray(p, sz, sx, offsets(A), _compact_rank(Val(R)))
 end
@@ -484,11 +487,12 @@ end
   Base.unsafe_convert(Ptr{T}, pointer(A))
 @inline Base.elsize(::AbstractStrideArray{T}) where {T} = sizeof(T)
 
-@inline ArrayInterface.size(A::AbstractPtrStrideArray) = getfield(A, :sizes)
-@inline function ArrayInterface.strides(
+@inline ArrayInterface.static_size(A::AbstractPtrStrideArray) =
+  getfield(A, :sizes)
+@inline function ArrayInterface.static_strides(
   A::AbstractPtrStrideArray{<:Any,<:Any,R}
 ) where {R}
-  _strides_entry(size(A), getfield(A, :strides), Val{R}(), valisbit(A))
+  _strides_entry(static_size(A), getfield(A, :strides), Val{R}(), valisbit(A))
 end
 ArrayInterface.device(::AbstractStrideArray) = ArrayInterface.CPUPointer()
 
@@ -562,7 +566,7 @@ end
 ) where {N,R}
   PtrArray(
     pointer(A),
-    size(A),
+    static_size(A),
     sparse_strides(A),
     ntuple(Returns(static(0)), Val(N)),
     Val{R}()
@@ -574,15 +578,15 @@ intlog2(::Type{T}) where {T} = intlog2(static_sizeof(T))
 @generated intlog2(::StaticInt{N}) where {N} =
   Expr(:call, Expr(:curly, :StaticInt, intlog2(N)))
 
-@inline Base.size(A::AbstractStrideArray) = map(Int, size(A))
-@inline Base.strides(A::AbstractStrideArray) = map(Int, strides(A))
+@inline Base.size(A::AbstractStrideArray) = map(Int, static_size(A))
+@inline Base.strides(A::AbstractStrideArray) = map(Int, static_strides(A))
 @inline function Base.stride(A::AbstractStrideArray, i::Int)
   x = Base.strides(A)
   @assert i > 0
-  i <= length(x) ? @inbounds(x[i]) : last(x) * Int(last(size(A)))
+  i <= length(x) ? @inbounds(x[i]) : last(x) * Int(last(static_size(A)))
 end
 @inline Base.stride(A::AbstractStrideArray, ::StaticInt{N}) where {N} =
-  Base.stride(A, N::Int)
+  Base.stride(A, N)
 @generated _oneto(x) = Expr(:new, Base.OneTo{Int}, :(x % Int))
 
 @inline create_axis(s, ::Zero) = CloseOpen(s)
@@ -591,8 +595,9 @@ end
 @inline create_axis(s, o) = CloseOpen(o, s + o)
 
 @inline ArrayInterface.axes(A::AbstractPtrArray) =
-  map(create_axis, size(A), offsets(A))
-@inline ArrayInterface.size(A::AbstractStrideArray) = size(PtrArray(A))
+  map(create_axis, static_size(A), offsets(A))
+@inline ArrayInterface.static_size(A::AbstractStrideArray) =
+  static_size(PtrArray(A))
 @inline ArrayInterface.axes(A::AbstractStrideArray) = axes(PtrArray(A))
 @inline Base.axes(A::AbstractStrideArray) = axes(A)
 @inline Base.axes(A::AbstractStrideArray, d::StaticInt) = axes(A, d)
@@ -641,7 +646,7 @@ end
 
 @inline ArrayInterface.offsets(A::AbstractPtrArray) = getfield(A, :offsets)
 @inline ArrayInterface.static_length(A::AbstractStrideArray) =
-  Static.reduce_tup(*, size(A))
+  Static.reduce_tup(*, static_size(A))
 
 # type stable, because index known at compile time
 @inline type_stable_select(t::NTuple, ::StaticInt{N}) where {N} = getfield(t, N)
@@ -662,7 +667,7 @@ end
 ) where {T,N}
   if i ≤ N
     o = type_stable_select(offsets(A), i)
-    s = type_stable_select(size(A), i)
+    s = type_stable_select(static_size(A), i)
     return create_axis(s, o)
   else
     return One():One()
@@ -670,19 +675,24 @@ end
 end
 @inline Base.axes(A::AbstractStrideArray, i::Integer) = axes(A, i)
 
-@inline function ArrayInterface.size(A::AbstractStrideVector, i::Int)
+@inline function ArrayInterface.static_size(A::AbstractStrideVector, i::Int)
   d = Int(length(A))
   ifelse(isone(i), d, one(d))
 end
-@inline ArrayInterface.size(::AbstractStrideVector, ::StaticInt{N}) where {N} =
-  One()
-@inline ArrayInterface.size(A::AbstractStrideVector, ::StaticInt{1}) = length(A)
-@inline ArrayInterface.size(A::AbstractStrideArray, ::StaticInt{N}) where {N} =
-  size(A)[N]
-@inline ArrayInterface.size(A::AbstractStrideArray, i::Int) =
-  type_stable_select(size(A), i)
+@inline ArrayInterface.static_size(
+  ::AbstractStrideVector,
+  ::StaticInt{N}
+) where {N} = One()
+@inline ArrayInterface.static_size(A::AbstractStrideVector, ::StaticInt{1}) =
+  length(A)
+@inline ArrayInterface.static_size(
+  A::AbstractStrideArray,
+  ::StaticInt{N}
+) where {N} = static_size(A)[N]
+@inline ArrayInterface.static_size(A::AbstractStrideArray, i::Int) =
+  type_stable_select(static_size(A), i)
 @inline Base.size(A::AbstractStrideArray, i::Union{Integer,StaticInt})::Int =
-  size(A, i)
+  static_size(A, i)
 
 # Base.IndexStyle(::Type{<:AbstractStrideArray}) = IndexCartesian()
 # Base.IndexStyle(::Type{<:AbstractStrideVector{<:Any,<:Any,<:Any,1}}) = IndexLinear()
@@ -775,7 +785,7 @@ rank2sortperm(R) =
     Expr(:meta, :inline),
     :(p = $ptr_expr),
     :(o = offsets(ptr)),
-    :(x = strides(ptr))
+    :(x = static_strides(ptr))
   )
   for n ∈ 1:N
     j = findfirst(==(n), sp)::Int
@@ -934,7 +944,7 @@ end
 ) where {Tnew,Told,N}
   szt_old = static_sizeof(Told)
   szt_new = static_sizeof(Tnew)
-  sz_old = size(A)
+  sz_old = static_size(A)
   sz1_new =
     _scale(first(contiguous_axis_indicator(A)), first(sz_old), szt_old, szt_new)
   sz_new = (sz1_new, Base.tail(sz_old)...)

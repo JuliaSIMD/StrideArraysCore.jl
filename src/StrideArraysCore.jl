@@ -5,17 +5,17 @@ if isdefined(Base, :Experimental) &&
 end
 
 using LayoutPointers,
-  ArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
+  StaticArrayInterface, ThreadingUtilities, ManualMemory, IfElse, Static
+const ArrayInterface = StaticArrayInterface
 using Static: StaticInt, StaticBool, True, False, Zero, One
 const Integer = Union{StaticInt,Base.BitInteger}
 
-using ArrayInterface:
+using StaticArrayInterface:
   OptionallyStaticUnitRange,
-  size,
-  strides,
+  static_size,
+  static_strides,
   offsets,
   indices,
-  length,
   static_length,
   static_first,
   static_last,
