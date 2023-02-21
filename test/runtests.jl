@@ -1,7 +1,8 @@
 using StrideArraysCore, ThreadingUtilities, Aqua
-using VectorizationBase: relu
 # using InteractiveUtils
 using Test
+
+@inline relu(x) = (y = zero(x); ifelse(x < y, y, x))
 
 function closeopensum(x)
   s = zero(eltype(x))
@@ -88,10 +89,10 @@ end
       Complex{Float64},
       reinterpret(reshape, Complex{UInt64}, Acomplex),
     )
-    @test StrideArraysCore.size(Acomplex) ===
-          StrideArraysCore.size(StrideArray(Acomplex)) ===
+    @test StrideArraysCore.static_size(Acomplex) ===
+          StrideArraysCore.static_size(StrideArray(Acomplex)) ===
           (StaticInt(4), StaticInt(5))
-    @test StrideArraysCore.size(reinterpret(reshape, Float64, Acomplex)) ===
+    @test StrideArraysCore.static_size(reinterpret(reshape, Float64, Acomplex)) ===
           (StaticInt(2), StaticInt(4), StaticInt(5))
     A = rand(100, 100)
     B = copy(A)
@@ -134,31 +135,31 @@ end
 
       D = copy(A)
       Cslice = view(C, 23:48, 17:89)
-      @test Base.stride(Cslice, 1) ==
-            Base.stride(C, 1) ==
-            StrideArraysCore.stride(Cslice, 1) ==
-            StrideArraysCore.stride(Cslice, static(1)) ==
-            StrideArraysCore.stride(C, 1) ==
-            StrideArraysCore.stride(C, static(1))
+      @test Base.stride(Cslice, 1) == 1
+      Base.stride(C, 1) ==
+      StrideArraysCore.static_strides(Cslice, 1) ==
+      StrideArraysCore.static_strides(Cslice, static(1)) ==
+      StrideArraysCore.static_strides(C, 1) ==
+      StrideArraysCore.static_strides(C, static(1))
       @test Base.stride(Cslice, 2) ==
             Base.stride(C, 2) ==
-            StrideArraysCore.stride(Cslice, 2) ==
-            StrideArraysCore.stride(Cslice, static(2)) ==
-            StrideArraysCore.stride(C, 2) ==
-            StrideArraysCore.stride(C, static(2))
+            StrideArraysCore.static_strides(Cslice, 2) ==
+            StrideArraysCore.static_strides(Cslice, static(2)) ==
+            StrideArraysCore.static_strides(C, 2) ==
+            StrideArraysCore.static_strides(C, static(2))
       if VERSION >= v"1.9.0-DEV.569"
         @test Base.stride(C, 3) ==
-              StrideArraysCore.stride(C, 3) ==
-              StrideArraysCore.stride(C, static(3))
+              StrideArraysCore.static_strides(C, 3) ==
+              StrideArraysCore.static_strides(C, static(3))
 
       end
-      @test Base.stride(C, 3) == StrideArraysCore.stride(C, 3)
-      @test Base.stride(Cslice, 3) == StrideArraysCore.stride(Cslice, 3)
-      @test Base.stride(Cslice, 3) == StrideArraysCore.stride(Cslice, static(3))
+      @test Base.stride(C, 3) == StrideArraysCore.static_strides(C, 3)
+      @test Base.stride(Cslice, 3) == StrideArraysCore.static_strides(Cslice, 3)
+      @test Base.stride(Cslice, 3) == StrideArraysCore.static_strides(Cslice, static(3))
       @test Base.strides(Cslice) ==
             Base.strides(C) ==
-            StrideArraysCore.strides(Cslice) ==
-            StrideArraysCore.strides(C)
+            StrideArraysCore.static_strides(Cslice) ==
+            StrideArraysCore.static_strides(C)
 
       Cslice .= 2
       @test D != C
@@ -167,14 +168,16 @@ end
       @test C === view(C, :, :)
       @test @inferred(size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
       @test @inferred(
-        StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))
+        StrideArraysCore.static_size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))
       ) === StaticInt(8)
       @test @inferred(
         (static ∘ size)(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))
       ) === StaticInt(8)
-      @test @inferred(StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), 1)) === 8
       @test @inferred(
-        StrideArraysCore.size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))
+        StrideArraysCore.static_size(view(C, StaticInt(1):StaticInt(8), :), 1)
+      ) === 8
+      @test @inferred(
+        StrideArraysCore.static_size(view(C, StaticInt(1):StaticInt(8), :), StaticInt(1))
       ) === StaticInt(8)
       @test @inferred(
         StrideArraysCore.ArrayInterface.known_size(
@@ -202,13 +205,13 @@ end
       ) === 5
       if VERSION >= v"1.6"
         @test @inferred(
-          StrideArraysCore.length(
+          StrideArraysCore.static_length(
             axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)),
           )
         ) === StaticInt(5)
       else
         @test @inferred(
-          StrideArraysCore.length(
+          StrideArraysCore.static_length(
             axes(StrideArraysCore.zview(C, StaticInt(2):StaticInt(6), :), StaticInt(1)),
           )
         ) === 5
@@ -324,18 +327,18 @@ end
   end
   @testset "StrideArrays Initialization" begin
     A = StrideArray{Float64}(undef, (3, 5))
-    @test StrideArraysCore.size(A) === (3, 5)
-    @test StrideArraysCore.strides(A) === (StaticInt(1), 3)
+    @test StrideArraysCore.static_size(A) === (3, 5)
+    @test StrideArraysCore.static_strides(A) === (StaticInt(1), 3)
     @test StrideArraysCore.static_length(A) === 15
 
     B = StrideArray(undef, (StaticInt(3), 5))
-    @test StrideArraysCore.strides(B) === (StaticInt(1), StaticInt(3))
-    @test StrideArraysCore.size(B) === (StaticInt(3), 5)
+    @test StrideArraysCore.static_strides(B) === (StaticInt(1), StaticInt(3))
+    @test StrideArraysCore.static_size(B) === (StaticInt(3), 5)
     @test StrideArraysCore.static_length(B) === 15
 
     D = StrideArray(undef, (StaticInt(3), StaticInt(5)))
-    @test StrideArraysCore.strides(D) === (StaticInt(1), StaticInt(3))
-    @test StrideArraysCore.size(D) === (StaticInt(3), StaticInt(5))
+    @test StrideArraysCore.static_strides(D) === (StaticInt(1), StaticInt(3))
+    @test StrideArraysCore.static_size(D) === (StaticInt(3), StaticInt(5))
     @test StrideArraysCore.static_length(D) === StaticInt(15)
     @test D isa StrideArraysCore.StaticStrideArray
     for C ∈ Any[A, B, D]

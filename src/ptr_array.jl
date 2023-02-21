@@ -604,6 +604,7 @@ end
 @inline Base.axes(A::AbstractStrideArray, d::StaticInt) = static_axes(A, d)
 @inline Base.axes(A::AbstractStrideArray, d::Int) = static_axes(A, d)
 
+
 @generated function ArrayInterface.axes_types(
   ::Type{<:AbstractStrideArray{T,N,R,S,X,O}}
 ) where {T,N,R,S,X,O}
