@@ -48,9 +48,6 @@ end
 @inline Base.pointer(A::AbstractStrideArrayImpl) = pointer(getfield(A, :ptr))
 @inline PtrArray(A::AbstractStrideArrayImpl) = getfield(A, :ptr)
 
-# const BitStrideArray{N,R,S,X,O} =
-#   Union{BitPtrArray{N,R,S,X,O},StrideBitArray{N,R,S,X,O}}
-
 @inline StrideArray(A::AbstractArray) = StrideArray(PtrArray(A), A)
 
 @inline function StrideArray{T}(
@@ -260,7 +257,7 @@ end
 end
 
 @inline function Base.view(
-  A::AbstractStrideArrayImpl,
+  A::AbstractStrideArray,
   i::Vararg{Union{Integer,AbstractRange,Colon},K}
 ) where {K}
   StrideArray(view(PtrArray(A), i...), preserve_buffer(A))
