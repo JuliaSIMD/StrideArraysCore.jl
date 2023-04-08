@@ -14,9 +14,14 @@ end
   A::AbstractPtrArray{T,1},
   i::AbstractUnitRange
 ) where {T}
-  sx = stride(A, static(1))
-  p = pointer(A) + (first(i) - first(offsets(A))) * sizeof(T) * sx
-  PtrArray(p, (static_length(i),), (sx,))
+  sx = only(static_strides(A))
+  if sx === static(1)
+    p = pointer(A) + (first(i) - first(offsets(A))) * sizeof(T)
+    PtrArray(p, (static_length(i),), (nothing,))
+  else
+    p = pointer(A) + (first(i) - first(offsets(A))) * sizeof(T) * sx
+    PtrArray(p, (static_length(i),), (sx,))
+  end
 end
 
 @inline function _view(

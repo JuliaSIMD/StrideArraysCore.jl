@@ -386,6 +386,11 @@ end
         @test A[j, n] == vAslice[j, i]
       end
     end
+    a = StrideArray(zeros(77));
+    b = view(a, 10:20);
+    b[4] = 7;
+    @test a[13] == 7
+    @test typeof(a) === typeof(b);
   end
   @testset "BitPtrArray" begin
     b = collect(1:10) .> 5
