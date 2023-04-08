@@ -387,10 +387,13 @@ end
       end
     end
     a = StrideArray(zeros(77));
-    b = view(a, 10:20);
+    b = a[10:20];
+    c = @view(a[20:30]);
     b[4] = 7;
     @test a[13] == 7
-    @test typeof(a) === typeof(b);
+    c[4] = 37;
+    @test a[23] == 37
+    @test typeof(a) === typeof(b) === typeof(c);
   end
   @testset "BitPtrArray" begin
     b = collect(1:10) .> 5
