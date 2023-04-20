@@ -367,3 +367,11 @@ end
   A::AbstractStrideArrayImpl
 ) where {T} =
   StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
+
+@inline Base.reinterpret(::Type{T}, A::StaticStrideArray) where {T} =
+  StrideArray(reinterpret(T, PtrArray(A)), A)
+@inline Base.reinterpret(
+  ::typeof(reshape),
+  ::Type{T},
+  A::StaticStrideArray
+) where {T} = StrideArray(reinterpret(reshape, T, PtrArray(A)), A)
