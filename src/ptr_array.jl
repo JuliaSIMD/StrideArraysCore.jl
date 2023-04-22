@@ -768,17 +768,9 @@ rank2sortperm(R) =
       )
     end
     # use only the first index. Supports, for example `x[i,1,1,1,1]` when `x` is a vector, or `A[i]` where `A` is an array with dim > 1.
-    i.parameters[1] === Colon &&
-      return Expr(:block, Expr(:meta, :inline), ptr_expr)
-    iexpr = :(first(i))
-    if i.parameters[1] <: AbstractRange
-      iexpr = :(first($iexpr))
-    end
-    return Expr(
-      :block,
-      Expr(:meta, :inline),
-      :($ptr_expr + ($iexpr - (ptr).si.offsets[1]) * $(static_sizeof(T)))
-    )
+    _N = 1
+  else
+    _N = N
   end
   sp = rank2sortperm(R)
   q = Expr(
@@ -788,7 +780,7 @@ rank2sortperm(R) =
     :(o = offsets(ptr)),
     :(x = static_strides(ptr))
   )
-  for n ∈ 1:N
+  for n ∈ 1:_N
     j = findfirst(==(n), sp)::Int
     ityp = i.parameters[j]
     ityp === Colon && continue
