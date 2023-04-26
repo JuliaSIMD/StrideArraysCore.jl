@@ -84,6 +84,8 @@ end
     Acomplex .= rand.(Complex{Float64})
     @test StrideArray(Acomplex) ===
           reinterpret(reshape, Complex{Float64}, reinterpret(reshape, Float64, Acomplex))
+    @test StrideArray(Acomplex) ===
+          reinterpret(Complex{Float64}, reinterpret(Float64, Acomplex))
     @test StrideArray(Acomplex) === reinterpret(
       reshape,
       Complex{Float64},
@@ -386,14 +388,14 @@ end
         @test A[j, n] == vAslice[j, i]
       end
     end
-    a = StrideArray(zeros(77));
-    b = a[10:20];
-    c = @view(a[20:30]);
-    b[4] = 7;
+    a = StrideArray(zeros(77))
+    b = a[10:20]
+    c = @view(a[20:30])
+    b[4] = 7
     @test a[13] == 7
-    c[4] = 37;
+    c[4] = 37
     @test a[23] == 37
-    @test typeof(a) === typeof(b) === typeof(c);
+    @test typeof(a) === typeof(b) === typeof(c)
   end
   @testset "BitPtrArray" begin
     b = collect(1:10) .> 5

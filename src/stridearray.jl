@@ -368,6 +368,30 @@ end
 ) where {T} =
   StrideArray(reinterpret(reshape, T, PtrArray(A)), preserve_buffer(A))
 
+@inline function Base.reinterpret(
+  ::typeof(reshape),
+  ::Type{U},
+  B::AbstractStrideArrayImpl{T,N,R,S,X,O,P,A}
+) where {U,T,N,R,S,X,O,P,A<:StaticStrideArray{U}}
+  C = B.data
+  if typeof(reinterpret(reshape, T, C)) === typeof(B)
+    C
+  else
+    StrideArray(reinterpret(reshape, T, PtrArray(B)), preserve_buffer(B))
+  end
+end
+@inline function Base.reinterpret(
+  ::Type{U},
+  B::AbstractStrideArrayImpl{T,N,R,S,X,O,P,A}
+) where {U,T,N,R,S,X,O,P,A<:StaticStrideArray{U}}
+  C = B.data
+  if typeof(reinterpret(T, C)) === typeof(B)
+    C
+  else
+    StrideArray(reinterpret(T, PtrArray(B)), preserve_buffer(B))
+  end
+end
+
 @inline Base.reinterpret(::Type{T}, A::StaticStrideArray) where {T} =
   StrideArray(reinterpret(T, PtrArray(A)), A)
 @inline Base.reinterpret(
