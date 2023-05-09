@@ -283,9 +283,9 @@ end
 @inline Base.transpose(a::AbstractStrideVector) =
   StrideArray(transpose(PtrArray(a)), preserve_buffer(a))
 
-function gc_preserve_call(ex, skip = 0)
+function gc_preserve_call(ex::Expr, skip::Int = 0, escape::Bool = true)
   q = Expr(:block)
-  call = Expr(:call, esc(ex.args[1]))
+  call = Expr(:call, escape ? esc(ex.args[1]) : ex.args[1])
   gcp = Expr(:gc_preserve, call)
   if length(ex.args) >= 2 && Meta.isexpr(ex.args[2], :parameters)
     params = ex.args[2]
@@ -308,13 +308,16 @@ function gc_preserve_call(ex, skip = 0)
     A = gensym(:A)
     buffer = gensym(:buffer)
     if arg isa Expr && arg.head === :kw
-      push!(call.args, Expr(:kw, arg.args[1], Expr(:call, :maybe_ptr_array, A)))
+      push!(call.args, Expr(:kw, arg.args[1], Expr(:call, maybe_ptr_array, A)))
       arg = arg.args[2]
     else
-      push!(call.args, Expr(:call, :maybe_ptr_array, A))
+      push!(call.args, Expr(:call, maybe_ptr_array, A))
     end
-    push!(q.args, :($A = $(esc(arg))))
-    push!(q.args, Expr(:(=), buffer, Expr(:call, :preserve_buffer, A)))
+    if escape
+      arg = esc(arg)
+    end
+    push!(q.args, :($A = $(arg)))
+    push!(q.args, Expr(:(=), buffer, Expr(:call, preserve_buffer, A)))
     push!(gcp.args, buffer)
   end
   push!(q.args, gcp)
