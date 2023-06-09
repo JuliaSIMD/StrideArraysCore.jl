@@ -68,7 +68,7 @@ if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
   end
 end
 
-if checkbounds_recompile
+if !checkbounds_recompile
   function __init__()
     ccall(:jl_generating_output, Cint, ()) == 1 && return nothing
     if Base.JLOptions().check_bounds == 1
