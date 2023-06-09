@@ -886,7 +886,12 @@ Base.@propagate_inbounds function Base.setindex!(
     PtrArray(A)[i...] = v
   end
 end
-boundscheck() = false
+if checkbounds_recompile
+  @eval boundscheck() = $(Base.JLOptions().check_bounds == 1)
+else
+  boundscheck() = false
+end
+
 @inline function Base.getindex(A::PtrArray, i::Vararg{Integer})
   boundscheck() && @boundscheck checkbounds(A, i...)
   pload(_offset_ptr(stridedpointer(A), i))
