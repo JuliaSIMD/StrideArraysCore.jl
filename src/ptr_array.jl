@@ -917,7 +917,12 @@ end
 @inline stride_rank_val(A::AbstractArray) = Val{map(Int, stride_rank(A))}()
 @inline stride_rank_val(A::AbstractStrideArray{T,N,R}) where {T,N,R} = Val{R}()
 
-@inline function _offset_ptr(A::AbstractArray, i)
+@inline _offset_ptr(A::AbstractArray, i::Tuple{}) = pointer(A)
+@inline function _offset_ptr(A::AbstractArray, i::Tuple{I}) where {I}
+  pointer(A) + Base.elsize(A) * (i[1] - ArrayInterface.offset1(A))
+end
+@inline function _offset_ptr(A::AbstractArray, i::Tuple{I,J,Vararg}) where {I,J}
+  A isa AbstractVector && return _offset_ptr(A, (first(i),))
   p = pointer(A)
   j = map(-, i, offsets(A))
   if all(dense_dims(A))
