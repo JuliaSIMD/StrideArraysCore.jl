@@ -754,9 +754,9 @@ rank2sortperm(R) =
   end
 
 @generated function _offset_ptr(
-  ptr::AbstractStridedPointer{T,N,C,B,R},
+  ptr::AbstractStridedPointer{T,N,C,B,R,X,O},
   i::Tuple{Vararg{Union{Integer,StaticInt,AbstractRange,Colon},NI}}
-) where {T,N,C,B,R,NI}
+) where {T,N,C,B,R,NI,X,O}
   ptr_expr = :(pointer(ptr))
   N == 0 && return Expr(:block, Expr(:meta, :inline), ptr_expr)
   if N ≠ NI
@@ -790,10 +790,12 @@ rank2sortperm(R) =
     end
     offst = Expr(:call, getfield, :o, j)
     strid = Expr(:call, getfield, :x, j)
+    offexpr = (O.parameters[j] === Zero) ? index : :($index - $offst)
+    offexpr = (X.parameters[j] === One) ? offexpr : :($offexpr * $strid)
     if T ≢ Bit
-      push!(q.args, :(p += ($index - $offst) * $strid))
+      push!(q.args, :(p += $offexpr))
     else
-      push!(q.args, :(p += (($index - $offst) * $strid) >>> 3))
+      push!(q.args, :(p += $offexpr >>> 3))
     end
   end
   push!(q.args, :(p))
@@ -892,13 +894,47 @@ else
   boundscheck() = false
 end
 
+@inline _offset_dense(i::Tuple{}, s::Tuple{}) = Zero()
+@inline _offset_dense(i::Tuple{I}, s::Tuple{S}) where {I,S} = i[1] * s[1]
+@inline _offset_dense(
+  i::Tuple{I,J,Vararg},
+  s::Tuple{S,T,Vararg}
+) where {I,J,S,T} = (i[1] + _offset_dense(Base.tail(i), Base.tail(s))) * s[1]
+@inline function _offset_ptr_dense(
+  p::Ptr{T},
+  i::Tuple{Vararg{Integer}},
+  s::Tuple{Vararg{Integer}}
+) where {T}
+  p + sizeof(T) * (first(i) + _offset_dense(Base.tail(i), Base.front(s)))
+end
+@inline function _offset_ptr_padded(
+  p::Ptr{T},
+  i::Tuple{Vararg{Integer}},
+  x::Tuple{Vararg{Integer}}
+) where {T}
+  p + sizeof(T) * Static.reduce_tup(+, map(*, i, x))
+end
+@inline stride_rank_val(A::AbstractArray) = Val{map(Int, stride_rank(A))}()
+@inline stride_rank_val(A::AbstractStrideArray{T,N,R}) where {T,N,R} = Val{R}()
+
+@inline function _offset_ptr(A::AbstractArray, i)
+  p = pointer(A)
+  j = map(-, i, offsets(A))
+  if all(dense_dims(A))
+    R = stride_rank_val(A)
+    _offset_ptr_dense(p, invpermtuple(j, R), invpermtuple(static_size(A), R))
+  else
+    _offset_ptr_padded(p, j, strides(A))
+  end
+end
+
 @inline function Base.getindex(A::PtrArray, i::Vararg{Integer})
   boundscheck() && @boundscheck checkbounds(A, i...)
-  pload(_offset_ptr(stridedpointer(A), i))
+  pload(_offset_ptr(A, i))
 end
 @inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer,K}) where {K}
   boundscheck() && @boundscheck checkbounds(A, i...)
-  pstore!(_offset_ptr(stridedpointer(A), i), v)
+  pstore!(_offset_ptr(A, i), v)
   v
 end
 @inline function Base.getindex(A::PtrArray{T}, i::Integer) where {T}
