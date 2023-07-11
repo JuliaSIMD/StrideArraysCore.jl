@@ -189,7 +189,7 @@ abstract type AbstractStrideArray{
   S<:Tuple{Vararg{Integer,N}},
   X<:Tuple{Vararg{Union{Integer,Nothing,StrideReset},N}},
   O<:Tuple{Vararg{Integer,N}}
-} <: DenseArray{T,N} end
+} <: AbstractArray{T,N} end
 abstract type AbstractPtrStrideArray{T,N,R,S,X,O} <:
               AbstractStrideArray{T,N,R,S,X,O} end
 const AbstractStrideVector{T,R,S,X,O} = AbstractStrideArray{T,1,R,S,X,O}
@@ -495,6 +495,9 @@ end
   _strides_entry(static_size(A), getfield(A, :strides), Val{R}(), valisbit(A))
 end
 ArrayInterface.device(::AbstractStrideArray) = ArrayInterface.CPUPointer()
+ArrayInterface.device(
+  ::SubArray{T,NS,AbstractPtrArray{T,N,R,S,X,O,P}}
+) where {T,NS,N,R,S,X,O,P} = ArrayInterface.CPUPointer()
 
 @generated function ArrayInterface.contiguous_axis(
   ::Type{<:AbstractStrideArray{<:Any,<:Any,R,<:Any,X}}
