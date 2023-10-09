@@ -48,8 +48,6 @@ export PtrArray, StrideArray, StaticInt, static, @gc_preserve
   (r::Returns)(args...) = r.x
 end
 
-const checkbounds_recompile = VERSION >= v"1.9.0" && Base.JLOptions().use_pkgimages == 1
-
 @generated static_sizeof(::Type{T}) where {T} =
   :(StaticInt{$(Base.allocatedinline(T) ? sizeof(T) : sizeof(Int))}())
 include("ptr_array.jl")
@@ -68,14 +66,5 @@ if VERSION >= v"1.7.0" && hasfield(Method, :recursion_relation)
   end
 end
 
-if !checkbounds_recompile
-  function __init__()
-    ccall(:jl_generating_output, Cint, ()) == 1 && return nothing
-    if Base.JLOptions().check_bounds == 1
-      @eval boundscheck() = true
-    end
-    #     # @require LoopVectorization="bdcacae8-1622-11e9-2a5c-532679323890" @eval using StrideArrays
-  end
-end
 
 end

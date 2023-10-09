@@ -73,11 +73,10 @@ end
 end
 
 @testset "StrideArraysCore.jl" begin
-
-  Aqua.test_all(StrideArraysCore)
+  # Currently StrideArraysCore commits piracy with zero_offsets(A::AbstractArray) and preserve_buffer(A::MemoryBuffer)
+  Aqua.test_all(StrideArraysCore; piracy=false) 
 
   @testset "StrideArrays Basic" begin
-    @test (Base.JLOptions().check_bounds == 1) == StrideArraysCore.boundscheck()
 
     Acomplex = StrideArray{Complex{Float64}}(undef, (StaticInt(4), StaticInt(5)))
     @test @inferred(StrideArraysCore.ArrayInterface.known_size(Acomplex)) === (4, 5)
