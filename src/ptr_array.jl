@@ -891,11 +891,6 @@ Base.@propagate_inbounds function Base.setindex!(
     PtrArray(A)[i...] = v
   end
 end
-if checkbounds_recompile
-  @eval boundscheck() = $(Base.JLOptions().check_bounds == 1)
-else
-  boundscheck() = false
-end
 
 @inline _offset_dense(i::Tuple{}, s::Tuple{}) = Zero()
 @inline _offset_dense(i::Tuple{I}, s::Tuple{S}) where {I,S} = i[1] * s[1]
@@ -937,32 +932,32 @@ end
 end
 
 @inline function Base.getindex(A::PtrArray, i::Vararg{Integer})
-  boundscheck() && @boundscheck checkbounds(A, i...)
+  @boundscheck checkbounds(A, i...)
   pload(_offset_ptr(A, i))
 end
 @inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer,K}) where {K}
-  boundscheck() && @boundscheck checkbounds(A, i...)
+  @boundscheck checkbounds(A, i...)
   pstore!(_offset_ptr(A, i), v)
   v
 end
 @inline function Base.getindex(A::PtrArray{T}, i::Integer) where {T}
-  boundscheck() && @boundscheck checkbounds(A, i)
+  @boundscheck checkbounds(A, i)
   pload(pointer(A) + (i - oneunit(i)) * static_sizeof(T))
 end
 @inline function Base.setindex!(A::PtrArray{T}, v, i::Integer) where {T}
-  boundscheck() && @boundscheck checkbounds(A, i)
+  @boundscheck checkbounds(A, i)
   pstore!(pointer(A) + (i - oneunit(i)) * static_sizeof(T), v)
   v
 end
 @inline function Base.getindex(A::PtrVector{T}, i::Integer) where {T}
-  boundscheck() && @boundscheck checkbounds(A, i)
+  @boundscheck checkbounds(A, i)
   pload(
     pointer(A) +
     (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A))
   )
 end
 @inline function Base.setindex!(A::PtrVector{T}, v, i::Integer) where {T}
-  boundscheck() && @boundscheck checkbounds(A, i)
+  @boundscheck checkbounds(A, i)
   pstore!(
     pointer(A) +
     (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)),
