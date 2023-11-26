@@ -74,7 +74,7 @@ end
 
 @testset "StrideArraysCore.jl" begin
   # Currently StrideArraysCore commits piracy with zero_offsets(A::AbstractArray) and preserve_buffer(A::MemoryBuffer)
-  Aqua.test_all(StrideArraysCore; piracy=false) 
+  Aqua.test_all(StrideArraysCore; piracies=false) 
 
   @testset "StrideArrays Basic" begin
 
