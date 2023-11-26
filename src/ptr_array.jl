@@ -189,7 +189,7 @@ abstract type AbstractStrideArray{
   S<:Tuple{Vararg{Integer,N}},
   X<:Tuple{Vararg{Union{Integer,Nothing,StrideReset},N}},
   O<:Tuple{Vararg{Integer,N}}
-} <: AbstractArray{T,N} end
+} <: DenseArray{T,N} end
 abstract type AbstractPtrStrideArray{T,N,R,S,X,O} <:
               AbstractStrideArray{T,N,R,S,X,O} end
 const AbstractStrideVector{T,R,S,X,O} = AbstractStrideArray{T,1,R,S,X,O}
