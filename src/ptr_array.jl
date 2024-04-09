@@ -232,11 +232,29 @@ const BitPtrVector1{R,S,X} = AbstractPtrArray{Bool,1,R,S,X,NTuple{1,One},Bit}
 const BitPtrMatrix0{R,S,X} = AbstractPtrArray{Bool,2,R,S,X,NTuple{2,Zero},Bit}
 const BitPtrMatrix1{R,S,X} = AbstractPtrArray{Bool,2,R,S,X,NTuple{2,One},Bit}
 
+struct SquarePtrMatrix{T,R,S,X,O} <:
+       AbstractPtrStrideArray{T,2,R,Tuple{S,S},X,O}
+  ptr::Ptr{T}
+  size::S
+  strides::X
+  offsets::O
+end
+SquarePtrMatrix(p::Ptr{T}, s::S) where {T,S} =
+  SquarePtrMatrix{T,(1, 2),S,Tuple{Nothing,Nothing},Tuple{One,One}}(
+    p,
+    s,
+    (nothing, nothing),
+    (One(), One())
+  )
+import LinearAlgebra
+LinearAlgebra.checksquare(A::SquarePtrMatrix) = getfield(A, :size)
+
 @inline valisbit(::AbstractPtrArray{<:Any,<:Any,<:Any,<:Any,<:Any,<:Any,Bit}) =
   Val(true)
 @inline valisbit(
   ::AbstractPtrArray{<:Any,<:Any,<:Any,<:Any,<:Any,<:Any,<:Any}
 ) = Val(false)
+@inline valisbit(::SquarePtrMatrix) = Val(false)
 
 # function PtrArray(
 #   ptr::Ptr{T}, sizes::S, strides::X, offsets::O, ::Val{R}
@@ -489,6 +507,10 @@ end
 
 @inline ArrayInterface.static_size(A::AbstractPtrStrideArray) =
   getfield(A, :sizes)
+@inline function ArrayInterface.static_size(A::SquarePtrMatrix)
+  s = getfield(A, :size)
+  (s, s)
+end
 @inline function ArrayInterface.static_strides(
   A::AbstractPtrStrideArray{<:Any,<:Any,R}
 ) where {R}

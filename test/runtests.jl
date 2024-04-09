@@ -74,7 +74,7 @@ end
 
 @testset "StrideArraysCore.jl" begin
   # Currently StrideArraysCore commits piracy with zero_offsets(A::AbstractArray) and preserve_buffer(A::MemoryBuffer)
-  Aqua.test_all(StrideArraysCore; piracies=false) 
+  Aqua.test_all(StrideArraysCore; piracies = false)
 
   @testset "StrideArrays Basic" begin
 
@@ -441,5 +441,12 @@ end
     conv_grouped!(relu, unpad(Ca), Aa, Ka, ba)
     @test C ≈ Ca
 
+  end
+  @testset "square" begin
+    A = rand(5, 5)
+    GC.@preserve A begin
+      B = StrideArraysCore.SquarePtrMatrix(pointer(A), 5)
+      @test A == B
+    end
   end
 end
