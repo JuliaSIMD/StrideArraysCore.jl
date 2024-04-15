@@ -239,15 +239,21 @@ struct SquarePtrMatrix{T,R,S,X,O} <:
   strides::X
   offsets::O
 end
-SquarePtrMatrix(p::Ptr{T}, s::S) where {T,S} =
-  SquarePtrMatrix{T,(1, 2),S,Tuple{Nothing,Nothing},Tuple{One,One}}(
-    p,
-    s,
-    (nothing, nothing),
-    (One(), One())
-  )
+@inline SquarePtrMatrix(
+  p::Ptr{T},
+  s::S,
+  strides::Tuple{X0,X1} = (nothing, nothing),
+  offsets::Tuple{O0,O1} = (One(), One())
+) where {T,S,X0,X1,O0,O1} =
+  SquarePtrMatrix{T,(1, 2),S,Tuple{X0,X1},Tuple{O0,O1}}(p, s, strides, offsets)
 import LinearAlgebra
 LinearAlgebra.checksquare(A::SquarePtrMatrix) = getfield(A, :size)
+
+Base.@propagate_inbounds function square_view(A::PtrMatrix, i)
+  sizes = size(A)
+  @boundscheck i <= min(sizes[1], sizes[2]) || throw(BoundsError(A, (i, i)))
+  SquarePtrMatrix(pointer(A), i, static_strides(A), offsets(A))
+end
 
 @inline valisbit(::AbstractPtrArray{<:Any,<:Any,<:Any,<:Any,<:Any,<:Any,Bit}) =
   Val(true)
