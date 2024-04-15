@@ -8,30 +8,31 @@
   q = Expr(
     :block,
     Expr(:meta, :inline),
-    :(sz = $getfield(A, :sizes)),
     :(sx = $getfield(A, :strides)),
     :(o = $getfield(A, :offsets))
   )
-  sz_expr = Expr(:tuple)
+  squaretype = A <: SquarePtrMatrix
+  if squaretype
+    sz_expr = :($getfield(A, :size))
+    PA = SquarePtrMatrix
+  else
+    push!(q.args, :(sz = $getfield(A, :sizes)))
+    sz_expr = Expr(:tuple)
+    PA = AbstractPtrArray
+  end
   sx_expr = Expr(:tuple)
   o_expr = Expr(:tuple)
   rv_expr = Expr(:tuple)
   for n = 1:N
     j = P[n]
-    push!(sz_expr.args, :($getfield(sz, $j)))
+    squaretype || push!(sz_expr.args, :($getfield(sz, $j)))
     push!(sx_expr.args, :($getfield(sx, $j)))
     push!(o_expr.args, :($getfield(o, $j)))
     push!(rv_expr.args, R[j])
   end
   push!(
     q.args,
-    :(AbstractPtrArray(
-      pointer(A),
-      $sz_expr,
-      $sx_expr,
-      $o_expr,
-      Val{$rv_expr}()
-    ))
+    :($PA(pointer(A), $sz_expr, $sx_expr, $o_expr, Val{$rv_expr}()))
   )
   q
 end
