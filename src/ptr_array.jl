@@ -1,3 +1,4 @@
+using Base: @propagate_inbounds
 
 @generated function permtuple(x::Tuple, ::Val{R}) where {R}
   t = Expr(:tuple)
@@ -898,6 +899,17 @@ Base.@propagate_inbounds function Base.getindex(
     PtrArray(A)[i...]
   end
 end
+@inline unsafe_getindex(A::AbstractStrideVector, i::Integer, ::Integer) =
+  unsafe_getindex(A, i)
+@inline function unsafe_getindex(
+  A::AbstractStrideArray,
+  i::Vararg{Union{Integer,StaticInt},K}
+) where {K}
+  b = preserve_buffer(A)
+  GC.@preserve b begin
+    unsafe_getindex(PtrArray(A), i...)
+  end
+end
 Base.@propagate_inbounds function Base.getindex(
   A::AbstractStrideArray,
   i::Vararg{Union{Integer,StaticInt,Colon,AbstractRange},K}
@@ -914,8 +926,18 @@ Base.@propagate_inbounds function Base.setindex!(
     PtrArray(A)[i...] = v
   end
 end
+@inline function unsafe_setindex!(
+  A::AbstractStrideArray,
+  v,
+  i::Vararg{Union{Integer,StaticInt},K}
+) where {K}
+  b = preserve_buffer(A)
+  GC.@preserve b begin
+    unsafe_setindex!(PtrArray(A), v, i...)
+  end
+end
 
-@inline _offset_dense(i::Tuple{}, s::Tuple{}) = Zero()
+@inline _offset_dense(::Tuple{}, ::Tuple{}) = Zero()
 @inline _offset_dense(i::Tuple{I}, s::Tuple{S}) where {I,S} = i[1] * s[1]
 @inline _offset_dense(
   i::Tuple{I,J,Vararg},
@@ -953,40 +975,76 @@ end
     _offset_ptr_padded(p, j, strides(A))
   end
 end
-
-@inline function Base.getindex(A::PtrArray, i::Vararg{Integer})
-  @boundscheck checkbounds(A, i...)
+@inline function unsafe_getindex(A::PtrArray, i::Vararg{Integer})
   pload(_offset_ptr(A, i))
 end
-@inline function Base.setindex!(A::PtrArray, v, i::Vararg{Integer,K}) where {K}
-  @boundscheck checkbounds(A, i...)
+@inline function unsafe_setindex!(
+  A::PtrArray,
+  v,
+  i::Vararg{Integer,K}
+) where {K}
   pstore!(_offset_ptr(A, i), v)
   v
 end
-@inline function Base.getindex(A::PtrArray{T}, i::Integer) where {T}
-  @boundscheck checkbounds(A, i)
+@inline function unsafe_getindex(A::PtrArray{T}, i::Integer) where {T}
   pload(pointer(A) + (i - oneunit(i)) * static_sizeof(T))
 end
-@inline function Base.setindex!(A::PtrArray{T}, v, i::Integer) where {T}
-  @boundscheck checkbounds(A, i)
+@inline function unsafe_setindex!(A::PtrArray{T}, v, i::Integer) where {T}
   pstore!(pointer(A) + (i - oneunit(i)) * static_sizeof(T), v)
   v
 end
-@inline function Base.getindex(A::PtrVector{T}, i::Integer) where {T}
-  @boundscheck checkbounds(A, i)
+@inline function unsafe_getindex(A::PtrVector{T}, i::Integer) where {T}
   pload(
     pointer(A) +
     (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A))
   )
 end
-@inline function Base.setindex!(A::PtrVector{T}, v, i::Integer) where {T}
-  @boundscheck checkbounds(A, i)
+@inline function unsafe_setindex!(A::PtrVector{T}, v, i::Integer) where {T}
   pstore!(
     pointer(A) +
     (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)),
     v
   )
   v
+end
+@propagate_inbounds function Base.getindex(A::PtrArray, i::Vararg{Integer})
+  @boundscheck checkbounds(A, i...)
+  unsafe_getindex(A, i...)
+end
+@propagate_inbounds function Base.setindex!(
+  A::PtrArray,
+  v,
+  i::Vararg{Integer,K}
+) where {K}
+  @boundscheck checkbounds(A, i...)
+  unsafe_setindex!(A, v, i...)
+end
+@propagate_inbounds function Base.getindex(A::PtrArray{T}, i::Integer) where {T}
+  @boundscheck checkbounds(A, i)
+  unsafe_getindex(A, i)
+end
+@propagate_inbounds function Base.setindex!(
+  A::PtrArray{T},
+  v,
+  i::Integer
+) where {T}
+  @boundscheck checkbounds(A, i)
+  unsafe_setindex!(A, v, i)
+end
+@propagate_inbounds function Base.getindex(
+  A::PtrVector{T},
+  i::Integer
+) where {T}
+  @boundscheck checkbounds(A, i)
+  unsafe_getindex(A, i)
+end
+@propagate_inbounds function Base.setindex!(
+  A::PtrVector{T},
+  v,
+  i::Integer
+) where {T}
+  @boundscheck checkbounds(A, i)
+  unsafe_setindex!(A, v, i)
 end
 
 _scale(::False, x, _, __) = x
