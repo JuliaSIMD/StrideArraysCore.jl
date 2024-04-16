@@ -1046,6 +1046,10 @@ end
   @boundscheck checkbounds(A, i)
   unsafe_setindex!(A, v, i)
 end
+# fallback implementations
+@inline unsafe_getindex(A, I::Vararg{Any,K}) where {K} = @inbounds A[I...]
+@inline unsafe_setindex!(A, v, I::Vararg{Any,K}) where {K} =
+  @inbounds A[I...] = v
 
 _scale(::False, x, _, __) = x
 @inline function _scale(::True, x, num, denom)
