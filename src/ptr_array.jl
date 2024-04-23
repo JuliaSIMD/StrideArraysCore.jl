@@ -527,7 +527,8 @@ ArrayInterface.device(
   ::Type{<:AbstractStrideArray{<:Any,<:Any,R,<:Any,X}}
 ) where {R,X}
   i = findfirst(isone, R)
-  C = i === nothing ? -1 : (X.parameters[i] === Nothing ? i : -1)
+  C = i === nothing ? -1 : (((X.parameters[i] === Nothing) || (X.parameters[i] === One)) ? i : -1)
+  # C = i === nothing ? -1 : ((X.parameters[i] === Nothing) ? i : -1)
   StaticInt{C}()
 end
 ArrayInterface.contiguous_batch_size(::Type{<:AbstractStrideArray}) =

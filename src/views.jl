@@ -96,11 +96,13 @@ function rank_to_sortperm(R::NTuple{N,Int}) where {N}
   sp
 end
 rank_to_sortperm(R) = sortperm(R)
-
-Base.@propagate_inbounds function square_view(A::PtrMatrix, i)
+_one_to_nothing(x::I) where {I} = StrideReset(x)
+_one_to_nothing(::One) = nothing
+Base.@propagate_inbounds function square_view(A::PtrMatrix{T,R,S,X,O}, i::I) where {T,R,S,X,O,I}
   # sizes = size(A)
   # @boundscheck i <= min(sizes[1], sizes[2]) || throw(BoundsError(A, (i, i)))
-  SquarePtrMatrix(pointer(A), i, static_strides(A), offsets(A))
+  x = map(_one_to_nothing, static_strides(A))
+  SquarePtrMatrix{T,R,I,typeof(x),O}(pointer(A), i, x, offsets(A))
 end
 # Base.@propagate_inbounds function square_view(A::AbstractMatrix, i)
 #   StrideArray(square_view(PtrArray(A), i), preserve_buffer(A))
