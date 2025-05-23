@@ -449,4 +449,38 @@ end
       @test A == B
     end
   end
+
+  @testset "PtrArray slicing" begin
+    # Testing for the bug in https://github.com/JuliaSIMD/StrideArrays.jl/issues/88
+    x = [1; 2;; 3; 4]
+    GC.@preserve x begin
+      ptrarrays = (
+        StrideArraysCore.PtrArray(pointer(x), (2, 2)),
+        StrideArraysCore.PtrArray(pointer(x), (StaticInt(2), StaticInt(2))),
+      )
+      for y in ptrarrays
+        @test y[1, 1] == x[1, 1]
+        @test y[2, 1] == x[2, 1]
+        @test y[1, 2] == x[1, 2]
+        @test y[2, 2] == x[2, 2]
+        y1 = y[1, :]
+        @test y1[1] == x[1, 1]
+        @test y1[2] == x[1, 2]
+        y2 = y[2, :]
+        @test y2[1] == x[2, 1]
+        @test y2[2] == x[2, 2]
+        y3 = y[:, 1]
+        @test y3[1] == x[1, 1]
+        @test y3[2] == x[2, 1]
+        @test_throws BoundsError y[1:5]
+        @test_throws BoundsError y[3, :]
+        @test_throws BoundsError y[:, 3]
+        @test_throws BoundsError y[2:3, :]
+        @test_throws BoundsError y1[3]
+        @test_throws BoundsError y1[1:3]
+        @test_throws BoundsError y2[3]
+        @test_throws BoundsError y2[1:3]
+      end
+    end
+  end
 end

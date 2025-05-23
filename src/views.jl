@@ -2,18 +2,23 @@
   A::AbstractPtrArray{T,N},
   i::Vararg{Union{Integer,AbstractRange,Colon},N}
 ) where {T,N}
-  PtrArray(SubArray(A, Base.to_indices(A, i)))
+  j = Base.to_indices(A, i)
+  @boundscheck checkbounds(A, j...)
+  PtrArray(SubArray(A, j))
 end
 @inline function Base.view(
   A::AbstractPtrArray{T,N},
   i::AbstractUnitRange
 ) where {T,N}
-  view(vec(A), i)
+  V = vec(A)
+  @boundscheck checkbounds(V, i)
+  view(V, i)
 end
 @inline function Base.view(
   A::AbstractPtrArray{T,1},
   i::AbstractUnitRange
 ) where {T}
+  @boundscheck checkbounds(A, i)
   sx = only(static_strides(A))
   if sx === static(1)
     p = pointer(A) + (first(i) - first(offsets(A))) * sizeof(T)

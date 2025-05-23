@@ -1008,9 +1008,10 @@ end
   )
   v
 end
-@propagate_inbounds function Base.getindex(A::PtrArray, i::Vararg{Integer})
-  @boundscheck checkbounds(A, i...)
-  unsafe_getindex(A, i...)
+# Copied from Base
+@inline function Base.getindex(A::PtrArray, i1::Int, i2::Int, I::Int...)
+    @boundscheck checkbounds(A, i1, i2, I...) # generally _to_linear_index requires bounds checking
+    return @inbounds A[Base._to_linear_index(A, i1, i2, I...)]
 end
 @propagate_inbounds function Base.setindex!(
   A::PtrArray,
