@@ -994,24 +994,25 @@ end
   pstore!(pointer(A) + (i - oneunit(i)) * static_sizeof(T), v)
   v
 end
-@inline function unsafe_getindex(A::PtrVector{T}, i::Integer) where {T}
+@inline function unsafe_getindex(A::PtrVector{T}, i::Vararg{Integer}) where {T}
+  i_ = first(i)
   pload(
     pointer(A) +
-    (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A))
+    (i_ - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A))
   )
 end
-@inline function unsafe_setindex!(A::PtrVector{T}, v, i::Integer) where {T}
+@inline function unsafe_setindex!(A::PtrVector{T}, v, i::Vararg{Integer}) where {T}
+  i_ = first(i)
   pstore!(
     pointer(A) +
-    (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)),
+    (i_ - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)),
     v
   )
   v
 end
-# Copied from Base
-@inline function Base.getindex(A::PtrArray, i1::Int, i2::Int, I::Int...)
-    @boundscheck checkbounds(A, i1, i2, I...) # generally _to_linear_index requires bounds checking
-    return @inbounds A[Base._to_linear_index(A, i1, i2, I...)]
+@propagate_inbounds function Base.getindex(A::PtrArray, i::Vararg{Integer})
+  @boundscheck checkbounds(A, i...)
+  unsafe_getindex(A, i...)
 end
 @propagate_inbounds function Base.setindex!(
   A::PtrArray,
