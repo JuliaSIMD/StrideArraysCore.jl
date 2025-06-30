@@ -459,11 +459,15 @@ end
         StrideArraysCore.PtrArray(pointer(x), (StaticInt(2), StaticInt(2))),
       )
       for y in ptrarrays
+        # This triggered the bug, a 2D index into a Vector, which is used by display/show
+        y1 = y[1, :]
+        @test y1[2, 1] == x[1, 2]
+
+        # Some general tests with slicing and bounds checking
         @test y[1, 1] == x[1, 1]
         @test y[2, 1] == x[2, 1]
         @test y[1, 2] == x[1, 2]
         @test y[2, 2] == x[2, 2]
-        y1 = y[1, :]
         @test y1[1] == x[1, 1]
         @test y1[2] == x[1, 2]
         y2 = y[2, :]
