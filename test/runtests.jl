@@ -452,7 +452,7 @@ end
 
   @testset "PtrArray slicing" begin
     # Testing for the bug in https://github.com/JuliaSIMD/StrideArrays.jl/issues/88
-    x = [1; 2;; 3; 4]
+    x = [1 3; 2 4]
     GC.@preserve x begin
       ptrarrays = (
         StrideArraysCore.PtrArray(pointer(x), (2, 2)),
