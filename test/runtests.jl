@@ -303,9 +303,9 @@ end
         @test p !== a
         @test p == a
       end
-      ThreadingUtilities.store!(pointer(xu), pg, offset)
-      @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pg), offset)) ===
-            (offset + sizeof(UInt), greet)
+      new_offset = ThreadingUtilities.store!(pointer(xu), pg, offset)
+      @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(pg), offset)) ==
+            (new_offset, greet)
       ThreadingUtilities.store!(pointer(xu), ph, offset)
       @test @inferred(ThreadingUtilities.load(pointer(xu), typeof(ph), offset)) ===
             (offset + sizeof(UInt), greet[1])
