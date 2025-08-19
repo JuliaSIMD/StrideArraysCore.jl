@@ -994,16 +994,18 @@ end
   pstore!(pointer(A) + (i - oneunit(i)) * static_sizeof(T), v)
   v
 end
-@inline function unsafe_getindex(A::PtrVector{T}, i::Integer) where {T}
+@inline function unsafe_getindex(A::PtrVector{T}, i::Vararg{Integer}) where {T}
+  i_ = first(i)
   pload(
     pointer(A) +
-    (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A))
+    (i_ - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A))
   )
 end
-@inline function unsafe_setindex!(A::PtrVector{T}, v, i::Integer) where {T}
+@inline function unsafe_setindex!(A::PtrVector{T}, v, i::Vararg{Integer}) where {T}
+  i_ = first(i)
   pstore!(
     pointer(A) +
-    (i - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)),
+    (i_ - ArrayInterface.offset1(A)) * only(LayoutPointers.bytestrides(A)),
     v
   )
   v
