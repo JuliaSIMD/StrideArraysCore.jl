@@ -969,7 +969,7 @@ end
   A isa AbstractVector && return _offset_ptr(A, (first(i),))
   p = pointer(A)
   j = map(-, i, offsets(A))
-  if all(dense_dims(A))
+  if all(Bool, dense_dims(A))
     R = stride_rank_val(A)
     _offset_ptr_dense(p, invpermtuple(j, R), invpermtuple(static_size(A), R))
   else
